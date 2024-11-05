@@ -16,11 +16,12 @@ for document_name in document_names:
 
     pdf_urls += sources
 
-print(len(pdf_urls))
+print("NUMBER OF DOCUMENTS:", len(pdf_urls))
 
-
-for pdf_url in pdf_urls:
-    response = requests.get(pdf_url)
+for i in range(len(pdf_urls)):
+    print(i)
+    pdf_url = pdf_urls[i]
+    response = requests.get(pdf_url.string)
     file_save_path = f"Documents/{document_name}.pdf"
 
     if response.status_code == 200:
@@ -28,3 +29,5 @@ for pdf_url in pdf_urls:
             file.write(response.content)
     else:
         print('Failed to download file')
+
+print("DONE")
