@@ -19,9 +19,8 @@ for document_name in document_names:
 
 print("NUMBER OF DOCUMENTS:", len(pdf_urls))
 
-start_time = time.time()
-
 for i in range(len(pdf_urls)):
+    start_time = time.time()
     print(i)
     pdf_url = pdf_urls[i]
     response = requests.get(pdf_url.string)
