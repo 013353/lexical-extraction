@@ -1,6 +1,7 @@
 from bs4 import BeautifulSoup
 import requests
 import re
+import time
 
 document_names = ["IBE-1", "IBE-2"]
 
@@ -18,6 +19,8 @@ for document_name in document_names:
 
 print("NUMBER OF DOCUMENTS:", len(pdf_urls))
 
+start_time = time.time()
+
 for i in range(len(pdf_urls)):
     print(i)
     pdf_url = pdf_urls[i]
@@ -29,5 +32,8 @@ for i in range(len(pdf_urls)):
             file.write(response.content)
     else:
         print('Failed to download file')
+    
+    end_time = time.time()
+    print(end_time-start_time, " seconds")
 
 print("DONE")
