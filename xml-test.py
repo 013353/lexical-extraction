@@ -3,28 +3,46 @@ import requests
 import re
 import time
 
-document_names = ["IBE-1", "IBE-2"]
+file_names = ["IBEUNESCO-1", "IBEUNESCO-2", "IBEUNESCO-3"]
 
-pdf_urls = []
+documents = {}
 
-for document_name in document_names:
 
-    doc = open(f"{document_name}.xml")
+for file in file_names:
+
+    doc = open(f"{file}.xml")
 
     soup = BeautifulSoup(doc, "xml")
 
-    sources = soup.find_all("dc:identifier", string=re.compile(r"\.pdf$"))
+    sources_list = soup.find_all("reference")
 
-    pdf_urls += sources
+    for source in sources_list:
+        try:
+            all_urls = source.find("ul", string=re.compile(r"\.pdf")).string.split(";\n\t")
+        except AttributeError:
+            print("NO PDF FOUND")
+            continue
 
-print("NUMBER OF DOCUMENTS:", len(pdf_urls))
+        document_name = source.find("t1").string
 
-for i in range(len(pdf_urls)):
+        document_year = source.find("yr").string
+
+        for url in all_urls:
+            if url.endswith(".pdf"):
+                documents.setdefault(document_name, (document_year, url))
+
+
+print("NUMBER OF DOCUMENTS:", len(documents))
+
+for name, info in documents.items():
     start_time = time.time()
-    print(i)
-    pdf_url = pdf_urls[i]
-    response = requests.get(pdf_url.string)
-    file_save_path = f"Documents/IBE-{i}.pdf"
+
+    pdf_url = info[1]
+    document_year = info[0]
+
+    response = requests.get(pdf_url)
+
+    file_save_path = f"Documents/{name} %{document_year}.pdf"
 
     if response.status_code == 200:
         with open(file_save_path, 'wb') as file:
