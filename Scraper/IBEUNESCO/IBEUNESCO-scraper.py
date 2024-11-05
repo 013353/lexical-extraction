@@ -33,6 +33,8 @@ for file in file_names:
 
 print("NUMBER OF DOCUMENTS:", len(documents))
 
+counter = 1
+
 for name, info in documents.items():
     start_time = time.time()
 
@@ -50,6 +52,6 @@ for name, info in documents.items():
         print('Failed to download file')
     
     end_time = time.time()
-    print(end_time-start_time, "sec")
+    print(f"{counter}/{len(documents)}: {end_time-start_time} sec")
 
 print("DONE")
