@@ -25,7 +25,7 @@ for i in range(len(pdf_urls)):
     print(i)
     pdf_url = pdf_urls[i]
     response = requests.get(pdf_url.string)
-    file_save_path = f"Documents/{document_name}.pdf"
+    file_save_path = f"Documents/IBE-{i}.pdf"
 
     if response.status_code == 200:
         with open(file_save_path, 'wb') as file:
@@ -34,6 +34,6 @@ for i in range(len(pdf_urls)):
         print('Failed to download file')
     
     end_time = time.time()
-    print(end_time-start_time, " seconds")
+    print((end_time-start_time)/60, " min")
 
 print("DONE")
