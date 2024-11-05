@@ -20,7 +20,6 @@ for file in file_names:
         try:
             all_urls = source.find("ul", string=re.compile(r"\.pdf")).string.split(";\n\t")
         except AttributeError:
-            print("NO PDF FOUND")
             continue
 
         document_name = source.find("t1").string
@@ -51,6 +50,6 @@ for name, info in documents.items():
         print('Failed to download file')
     
     end_time = time.time()
-    print((end_time-start_time)/60, " min")
+    print(end_time-start_time, "sec")
 
 print("DONE")
