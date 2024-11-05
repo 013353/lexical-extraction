@@ -53,5 +53,6 @@ for name, info in documents.items():
     
     end_time = time.time()
     print(f"{counter}/{len(documents)}: {end_time-start_time} sec")
+    counter += 1
 
 print("DONE")
