@@ -10,7 +10,7 @@ documents = {}
 
 for file in file_names:
 
-    doc = open(f"{file}.xml")
+    doc = open(f"Scraper/IBEUNESCO/{file}.xml")
 
     soup = BeautifulSoup(doc, "xml")
 
