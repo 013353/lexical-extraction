@@ -2,6 +2,8 @@ from bs4 import BeautifulSoup
 import requests
 import re
 import time
+import subprocess
+import os
 
 file_names = ["IBEUNESCO-1", "IBEUNESCO-2", "IBEUNESCO-3"]
 
@@ -43,13 +45,16 @@ for name, info in documents.items():
 
     response = requests.get(pdf_url)
 
-    file_save_path = f"Documents/{name} %{document_year}.pdf"
+    pdf_file_path = f"Documents/{name} %{document_year}.pdf"
 
     if response.status_code == 200:
-        with open(file_save_path, 'wb') as file:
+        with open(pdf_file_path, 'wb') as file:
             file.write(response.content)
+            text_file_path = f"Documents/{name} %{document_year}.txt"
+            subprocess.run(["ebook-convert", pdf_file_path, text_file_path, "--enable-heuristics"])
+            os.remove(pdf_file_path)
     else:
-        print('Failed to download file')
+        print("Failed to download file")
     
     end_time = time.time()
     print(f"{counter}/{len(documents)}: {end_time-start_time} sec")
