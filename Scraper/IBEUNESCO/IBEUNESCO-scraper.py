@@ -51,7 +51,8 @@ for name, info in documents.items():
         with open(pdf_file_path, 'wb') as file:
             file.write(response.content)
             text_file_path = f"Documents/{name} %{document_year}.txt"
-            subprocess.run(["ebook-convert", pdf_file_path, text_file_path, "--enable-heuristics"])
+            subprocess.run(["ocrmypdf", pdf_file_path, pdf_file_path, "--remove-background"])
+            subprocess.run(["ebook-convert", pdf_file_path, text_file_path, "--pdf-engine", "pdftohtml","--enable-heuristics"])
             os.remove(pdf_file_path)
     else:
         print("Failed to download file")
