@@ -4,6 +4,7 @@ import re
 import time
 import subprocess
 import os
+import html2text
 
 file_names = ["CTE"]
 
@@ -22,57 +23,33 @@ for file in file_names:
     for source in sources_list:
         source_url = source["href"].split("?")[0]
         links_list.append(source_url)
-        source_page = open(source_url)
+        source_page = requests.get(source_url).text
         source_soup = BeautifulSoup(source_page, "html.parser")
 
-        section_links_list = source_soup.find("div", class_ = "main-panel").find("ul").find_all("li", class_="mb-0_5")
+        section_link_elements = source_soup.find("div", class_="main-panel").find("ul").find_all("li", class_="mb-0_5", recursive=False)
+        section_links = []
+        for section_link_element in section_link_elements:
+            section_links.append(section_link_element.find("a", class_="article-link")["href"])
 
-        for section_link in section_links_list:
-            section_page = open(section_link)
+
+        for section_link in section_links:
+            section_page = requests.get(section_link).text
+            section_soup = BeautifulSoup(section_page, "html.parser")
+            pages = section_soup.find_all("article", class_="fullview-page")
+            h = html2text.HTML2Text()
+            h.ignore_links = True
+            text = ""
+            for page in pages:
+                print(page)
+                input("Press ENTER to continue:")
+                try:
+                    text += h.handle(page)
+                except TypeError:
+                    print("PROBLEM")
+                    continue
+            print(text)
+            input("Press ENTER to continue:")
+            
 
     print(links_list)
     print(len(links_list))
-
-#     for source in sources_list:
-#         try:
-#             all_urls = source.find("ul", string=re.compile(r"\.pdf")).string.split(";\n\t")
-#         except AttributeError:
-#             continue
-
-#         document_name = source.find("t1").string
-
-#         document_year = source.find("yr").string
-
-#         for url in all_urls:
-#             if url.endswith(".pdf"):
-#                 documents.setdefault(document_name, (document_year, url))
-
-
-# print("NUMBER OF DOCUMENTS:", len(documents))
-
-# counter = 1
-
-# for name, info in documents.items():
-#     start_time = time.time()
-
-#     pdf_url = info[1]
-#     document_year = info[0]
-
-#     response = requests.get(pdf_url)
-
-#     pdf_file_path = f"Documents/{name} %{document_year}.pdf"
-
-#     if response.status_code == 200:
-#         with open(pdf_file_path, 'wb') as file:
-#             file.write(response.content)
-#             text_file_path = f"Documents/{name} %{document_year}.txt"
-#             subprocess.run(["ebook-convert", pdf_file_path, text_file_path, "--enable-heuristics"])
-#             os.remove(pdf_file_path)
-#     else:
-#         print("Failed to download file")
-    
-#     end_time = time.time()
-#     print(f"{counter}/{len(documents)}: {end_time-start_time} sec")
-#     counter += 1
-
-# print("DONE")
