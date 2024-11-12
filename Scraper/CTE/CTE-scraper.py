@@ -31,7 +31,6 @@ for file in file_names:
         for section_link_element in section_link_elements:
             section_links.append(section_link_element.find("a", class_="article-link")["href"])
 
-
         for section_link in section_links:
             section_page = requests.get(section_link).text
             section_soup = BeautifulSoup(section_page, "html.parser")
@@ -40,13 +39,24 @@ for file in file_names:
             h.ignore_links = True
             text = ""
             for page in pages:
-                print(page)
+                print(page.prettify())
                 input("Press ENTER to continue:")
-                try:
-                    text += h.handle(page)
-                except TypeError:
-                    print("PROBLEM")
-                    continue
+                blacklist = ['style', 'script', 'head', 'title', 'meta', '[document]']
+                texts = page.find_all(text=True)
+
+                def tag_visible(element):
+                    if element.parent.name in ['style', 'script', 'head', 'title', 'meta', '[document]']:
+                        return False
+                    if isinstance(element, BeautifulSoup.element.Comment):
+                        return False
+                    return True
+
+                # try:
+                #     text += h.handle(page)
+                # except TypeError:
+                #     print("PROBLEM")
+                #     input("Press ENTER to continue:")
+                #     continue
             print(text)
             input("Press ENTER to continue:")
             
