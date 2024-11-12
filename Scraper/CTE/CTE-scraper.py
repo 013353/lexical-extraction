@@ -25,9 +25,10 @@ for file in file_names:
         source_page = open(source_url)
         source_soup = BeautifulSoup(source_page, "html.parser")
 
-        section_links_list = source_soup.find("div", class_ = "main-panel").find("ul")
+        section_links_list = source_soup.find("div", class_ = "main-panel").find("ul").find_all("li", class_="mb-0_5")
 
-        
+        for section_link in section_links_list:
+            section_page = open(section_link)
 
     print(links_list)
     print(len(links_list))
