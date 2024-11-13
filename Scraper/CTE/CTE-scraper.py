@@ -1,65 +1,67 @@
-from bs4 import BeautifulSoup
+import bs4
 import requests
 import re
 import time
-import subprocess
-import os
-import html2text
 
-file_names = ["CTE"]
+search_results_page = open(f"Scraper/CTE/CTE.html")
 
-documents = {}
+search_results_soup = bs4.BeautifulSoup(search_results_page, "html.parser")
 
+document_links = search_results_soup.find_all("a", class_="results-link")
 
-for file in file_names:
+print('\033[96m', "NUMBER OF DOCUMENTS:", len(document_links), '\033[0m')
 
-    search_results = open(f"Scraper/CTE/{file}.html")
+counter = 1
 
-    soup = BeautifulSoup(search_results, "html.parser")
-
-    sources_list = soup.find_all("a", class_="results-link")
+for doc in document_links:
+    start_time = time.time()
     
-    links_list = []
-    for source in sources_list:
-        source_url = source["href"].split("?")[0]
-        links_list.append(source_url)
-        source_page = requests.get(source_url).text
-        source_soup = BeautifulSoup(source_page, "html.parser")
+    print('\033[95m', f"{counter}/{len(document_links)}", '\033[0m', end=" ")
+    
+    doc_url = doc["href"].split("?")[0]
+    doc_page = requests.get(doc_url).text
+    doc_soup = bs4.BeautifulSoup(doc_page, "html.parser")
+    
+    # [regex]          either . or / 
+    doc_title = re.sub("[./]", "", doc_soup.find("div", attrs={"data-key": "title"}).find("dd").contents[0])
+    
+    pubinfo = doc_soup.find("div", attrs={"data-key": "pubinfo"}).find_all("dd")
+    for line in pubinfo:
+        # [regex]                exactly four digits at a word boundary
+        year_search = re.search(r"\b\d{4}", str(line))
+        if year_search:
+            doc_year = year_search.group(0)
+    
+    doc_text = ""
 
-        section_link_elements = source_soup.find("div", class_="main-panel").find("ul").find_all("li", class_="mb-0_5", recursive=False)
-        section_links = []
-        for section_link_element in section_link_elements:
-            section_links.append(section_link_element.find("a", class_="article-link")["href"])
+    section_link_elements = doc_soup.find("div", class_="main-panel").find("ul").find_all("li", class_="mb-0_5", recursive=False)
+    section_links = []
+    for section_link_element in section_link_elements:
+        section_links.append(section_link_element.find("a", class_="article-link")["href"])
 
-        for section_link in section_links:
-            section_page = requests.get(section_link).text
-            section_soup = BeautifulSoup(section_page, "html.parser")
-            pages = section_soup.find_all("article", class_="fullview-page")
-            h = html2text.HTML2Text()
-            h.ignore_links = True
-            text = ""
-            for page in pages:
-                print(page.prettify())
-                input("Press ENTER to continue:")
-                blacklist = ['style', 'script', 'head', 'title', 'meta', '[document]']
-                texts = page.find_all(text=True)
-
-                def tag_visible(element):
-                    if element.parent.name in ['style', 'script', 'head', 'title', 'meta', '[document]']:
-                        return False
-                    if isinstance(element, BeautifulSoup.element.Comment):
-                        return False
-                    return True
-
-                # try:
-                #     text += h.handle(page)
-                # except TypeError:
-                #     print("PROBLEM")
-                #     input("Press ENTER to continue:")
-                #     continue
-            print(text)
-            input("Press ENTER to continue:")
+    for section_link in section_links:
+        section_page = requests.get(section_link).text
+        section_soup = bs4.BeautifulSoup(section_page, "html.parser")
+        paragraphs = section_soup.find_all("p", attrs={"data-debug": "otherwise"})
+        
+        for para in paragraphs:
             
-
-    print(links_list)
-    print(len(links_list))
+            for child in para.contents:
+                if type(child) != bs4.element.NavigableString:
+                    if child.name in ["span", "blockquote"]:
+                        child.unwrap()
+                    else:
+                        child.decompose()
+                
+            para.smooth()
+            
+            if len(para) > 0:
+                try: doc_text += para.contents[0]
+                except TypeError: para.unwrap
+    
+    doc_file = open(f"Scraper/Documents/{doc_title[:150]} %{doc_year}.txt", "w")
+    doc_file.write(doc_text)
+    
+    print(time.time() - start_time, "sec")
+    
+print('\033[92m', "DONE", '\033[0m')
