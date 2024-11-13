@@ -33,7 +33,7 @@ for file in file_names:
                 documents.setdefault(document_name, (document_year, url))
 
 
-print("NUMBER OF DOCUMENTS:", len(documents))
+print('\033[96m', "NUMBER OF DOCUMENTS:", len(documents), '\033[0m')
 
 counter = 1
 
@@ -61,4 +61,4 @@ for name, info in documents.items():
     print(f"{counter}/{len(documents)}: {end_time-start_time} sec")
     counter += 1
 
-print("DONE")
+print('\033[92m', "DONE", '\033[0m')
