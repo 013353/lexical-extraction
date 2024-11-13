@@ -58,7 +58,7 @@ for name, info in documents.items():
         print("Failed to download file")
     
     end_time = time.time()
-    print(f"{counter}/{len(documents)}: {end_time-start_time} sec")
+    print('\033[95m', f"{counter}/{len(documents)}", '\033[0m', f": {end_time-start_time} sec")
     counter += 1
 
 print('\033[92m', "DONE", '\033[0m')

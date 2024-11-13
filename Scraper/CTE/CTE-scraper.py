@@ -16,7 +16,7 @@ counter = 1
 for doc in document_links:
     start_time = time.time()
     
-    print('\033[95m', f"{counter}/{len(document_links)}", '\033[0m', end=" ")
+    print('\033[95m', f"{counter}/{len(document_links)}", '\033[0m', end=": ")
     
     doc_url = doc["href"].split("?")[0]
     doc_page = requests.get(doc_url).text
