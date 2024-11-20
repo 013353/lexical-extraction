@@ -5,6 +5,17 @@ import time
 import subprocess
 import os
 
+class colors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
 file_names = ["IBEUNESCO-1", "IBEUNESCO-2", "IBEUNESCO-3"]
 
 documents = {}
@@ -33,7 +44,7 @@ for file in file_names:
                 documents.setdefault(document_name, (document_year, url))
 
 
-print('\033[96m', "NUMBER OF DOCUMENTS:", len(documents), '\033[0m')
+print(colors.OKCYAN, "NUMBER OF DOCUMENTS:", len(documents), colors.ENDC)
 
 counter = 1
 
@@ -47,6 +58,7 @@ for name, info in documents.items():
 
     pdf_file_path = f"Documents/{name} %{document_year}.pdf"
 
+    # [response code]          OK
     if response.status_code == 200:
         with open(pdf_file_path, 'wb') as file:
             file.write(response.content)
@@ -58,7 +70,7 @@ for name, info in documents.items():
         print("Failed to download file")
     
     end_time = time.time()
-    print('\033[95m', f"{counter}/{len(documents)}", '\033[0m', f": {end_time-start_time} sec")
+    print(colors.HEADER, f"{counter}/{len(documents)}", colors.ENDC, time.time()-start_time,  "sec")
     counter += 1
 
-print('\033[92m', "DONE", '\033[0m')
+print(colors.OKGREEN, "DONE", colors.ENDC)

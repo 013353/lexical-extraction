@@ -3,6 +3,17 @@ import requests
 import re
 import time
 
+class colors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
 sources = ["ECCO", "EEBO", "EVANS"]
 
 for source in sources:
@@ -13,14 +24,12 @@ for source in sources:
 
     document_links = search_results_soup.find_all("a", class_="results-link")
 
-    print('\033[96m', "NUMBER OF DOCUMENTS:", len(document_links), '\033[0m')
+    print(colors.OKCYAN, "NUMBER OF DOCUMENTS:", len(document_links), colors.ENDC)
 
     counter = 1
 
     for doc in document_links:
         start_time = time.time()
-        
-        print('\033[95m', f"{counter}/{len(document_links)}", '\033[0m', end=": ")
         
         doc_url = doc["href"]
         doc_page = requests.get(doc_url).text
@@ -66,7 +75,7 @@ for source in sources:
         doc_file = open(f"Documents/{doc_title[:150]} %{doc_year}.txt", "w")
         doc_file.write(doc_text)
         
-        print(time.time() - start_time, "sec")
+        print(colors.HEADER, f"{counter}/{len(document_links)}", colors.ENDC, time.time()-start_time,  "sec")
         counter += 1
     
-print('\033[92m', "DONE", '\033[0m')
+print(colors.OKGREEN, "DONE", colors.ENDC)
