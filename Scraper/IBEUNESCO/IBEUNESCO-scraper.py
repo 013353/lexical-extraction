@@ -21,11 +21,11 @@ file_names = ["IBEUNESCO-1", "IBEUNESCO-2", "IBEUNESCO-3"]
 documents = {}
 
 
-for file in file_names:
+for search_file_name in file_names:
 
-    doc = open(f"Scraper/IBEUNESCO/{file}.xml")
+    search_file = open(f"Scraper/IBEUNESCO/{search_file_name}.xml")
 
-    soup = BeautifulSoup(doc, "xml")
+    soup = BeautifulSoup(search_file, "xml")
 
     sources_list = soup.find_all("reference")
 
