@@ -56,13 +56,13 @@ for name, info in documents.items():
 
     response = requests.get(pdf_url)
 
-    pdf_file_path = f"Documents/{name} %{document_year}.pdf"
+    pdf_file_path = f"Documents/{name[:150]} %{document_year}.pdf"
 
     # [response code]          OK
     if response.status_code == 200:
         with open(pdf_file_path, 'wb') as file:
             file.write(response.content)
-            text_file_path = f"Documents/{name} %{document_year}.txt"
+            text_file_path = f"Documents/{name[:150]} %{document_year}.txt"
             subprocess.run(["ocrmypdf", pdf_file_path, pdf_file_path, "--remove-background"])
             subprocess.run(["ebook-convert", pdf_file_path, text_file_path, "--pdf-engine", "pdftohtml","--enable-heuristics"])
             os.remove(pdf_file_path)

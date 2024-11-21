@@ -38,7 +38,7 @@ for doc in documents:
         doc_url = f"https://archive.org/download/{doc_id}/{doc_id}_djvu.txt"
         response = requests.get(doc_url)
 
-        text_file_path = f"Documents/{doc_title} %{doc_year}.txt"
+        text_file_path = f"Documents/{doc_title[:150]} %{doc_year}.txt"
 
         # [response code]          OK    
         if response.status_code == 200:
