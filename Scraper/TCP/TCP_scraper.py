@@ -2,17 +2,7 @@ import bs4
 import requests
 import re
 import time
-
-class colors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
+import scraper_tools
 
 sources = ["ECCO", "EEBO", "EVANS"]
 
@@ -24,7 +14,7 @@ for source in sources:
 
     document_links = search_results_soup.find_all("a", class_="results-link")
 
-    print(colors.OKCYAN, "NUMBER OF DOCUMENTS:", len(document_links), colors.ENDC)
+    print(scraper_tools.colors.OKCYAN, "NUMBER OF DOCUMENTS:", len(document_links), scraper_tools.colors.ENDC)
 
     counter = 1
 
@@ -72,10 +62,10 @@ for source in sources:
                     try: doc_text += para.contents[0]
                     except TypeError: para.unwrap
         
-        doc_file = open(f"Documents/{doc_title[:150]} %{doc_year}.txt", "w")
+        doc_file = open(f"Documents/{scraper_tools.format_name(doc_title)} %{doc_year}.txt", "w")
         doc_file.write(doc_text)
         
-        print(colors.HEADER, f"{counter}/{len(document_links)}", colors.ENDC, time.time()-start_time,  "sec")
+        print(scraper_tools.colors.HEADER, f"{counter}/{len(document_links)}", scraper_tools.colors.ENDC, time.time()-start_time,  "sec")
         counter += 1
     
-print(colors.OKGREEN, "DONE", colors.ENDC)
+print(scraper_tools.colors.OKGREEN, "DONE", scraper_tools.colors.ENDC)
