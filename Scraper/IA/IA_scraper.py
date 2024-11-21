@@ -1,17 +1,7 @@
 import bs4
 import requests
 import time
-
-class colors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
+import scraper_tools
 
 search_results_page = open(f"Scraper/IA/IA.xml")
 
@@ -19,7 +9,7 @@ search_results_soup = bs4.BeautifulSoup(search_results_page, "xml")
 
 documents = search_results_soup.find_all("doc")
 
-print(colors.OKCYAN, "NUMBER OF DOCUMENTS:", len(documents), colors.ENDC)
+print(scraper_tools.scraper_tools.colors.OKCYAN, "NUMBER OF DOCUMENTS:", len(documents), scraper_tools.colors.ENDC)
 
 counter = 1
 for doc in documents:
@@ -38,20 +28,20 @@ for doc in documents:
         doc_url = f"https://archive.org/download/{doc_id}/{doc_id}_djvu.txt"
         response = requests.get(doc_url)
 
-        text_file_path = f"Documents/{doc_title[:150]} %{doc_year}.txt"
+        text_file_path = f"Documents/{scraper_tools.format_name(doc_title)} %{doc_year}.txt"
 
         # [response code]          OK    
         if response.status_code == 200:
             with open(text_file_path, 'wb') as file:
                 file.write(response.content)
-                print(colors.HEADER, f"{counter}/{len(documents)}", colors.ENDC, time.time()-start_time,  "sec")
+                print(scraper_tools.colors.HEADER, f"{counter}/{len(documents)}", scraper_tools.colors.ENDC, time.time()-start_time,  "sec")
 
         else:
-            print(colors.HEADER, f"{counter}/{len(documents)}", colors.FAIL, "ERROR", response.status_code, colors.ENDC)
+            print(scraper_tools.colors.HEADER, f"{counter}/{len(documents)}", scraper_tools.colors.FAIL, "ERROR", response.status_code, scraper_tools.colors.ENDC)
 
     else:
-        print(colors.HEADER, f"{counter}/{len(documents)}", colors.FAIL, "INSUFFICIENT DATA", colors.ENDC)
+        print(scraper_tools.colors.HEADER, f"{counter}/{len(documents)}", scraper_tools.colors.FAIL, "INSUFFICIENT DATA", scraper_tools.colors.ENDC)
 
     counter += 1
 
-print(colors.OKGREEN, "DONE", colors.ENDC)
+print(scraper_tools.colors.OKGREEN, "DONE", scraper_tools.colors.ENDC)
