@@ -9,7 +9,7 @@ search_results_soup = bs4.BeautifulSoup(search_results_page, "xml")
 
 documents = search_results_soup.find_all("doc")
 
-print(scraper_tools.scraper_tools.colors.OKCYAN, "NUMBER OF DOCUMENTS:", len(documents), scraper_tools.colors.ENDC)
+print(scraper_tools.colors.OKCYAN, "NUMBER OF DOCUMENTS:", len(documents), scraper_tools.colors.ENDC)
 
 counter = 1
 for doc in documents:
