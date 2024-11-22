@@ -8,7 +8,7 @@ sources = ["ECCO", "EEBO", "EVANS"]
 
 for source in sources:
 
-    search_results_page = open(f"Scraper/TCP/TCP-{source}.html")
+    search_results_page = open(f"Scraper/TCP/TCP_{source}.html")
 
     search_results_soup = bs4.BeautifulSoup(search_results_page, "html.parser")
 
