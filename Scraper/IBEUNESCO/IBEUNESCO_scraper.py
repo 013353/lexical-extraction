@@ -6,7 +6,7 @@ import subprocess
 import os
 import scraper_tools
 
-file_names = ["IBEUNESCO-1", "IBEUNESCO-2", "IBEUNESCO-3"]
+file_names = ["IBEUNESCO_1", "IBEUNESCO_2", "IBEUNESCO_3"]
 
 documents = {}
 
