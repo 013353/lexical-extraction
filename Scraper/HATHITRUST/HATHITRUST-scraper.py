@@ -41,16 +41,34 @@ for result_page_num in range(1, num_pages + 1):
             
             page_soup = BeautifulSoup(requests.get(result_text_url + "&seq=" + str(page_num)).text, "html.parser")
             
-            if page_soup.find("p", string=re.compile("This is the last page")):
+            # with open("log.txt", 'a') as file:
+            #     file.write("----------------------------------------------------------------------------------------------\n" + page_soup.prettify())
+            
+            print(page_soup.find("p", string=re.compile("This is the last page")))
+            
+            paragraphs = page_soup.find_all("p")
+            
+            last_page = False
+            
+            for para in paragraphs:
+                if (para.strings != []):
+                    for string in para.strings:
+                        if re.search(re.compile("This is the last page"), string):
+                            last_page = True
+        
+            if last_page:
+                print("last page")
                 breakout = True
                 break
             elif page_soup.find("div", id="mdpTextEmpty"):
+                print("page skipped")
                 continue
             
             # print(doc_text)
-            doc_text += page_soup.find("p", class_="Text").contents[0] + "\n"
+            page_text = page_soup.find("p", class_="Text").contents[0] + "\n"
+            doc_text += page_text
+            print(page_text)
             print("page added", page_num)
         print(doc_text)
         print(time.time()-start_time)
         # print(scraper_tools.colors.HEADER, f"{counter}/{len(documents)}", scraper_tools.colors.ENDC, time.time()-start_time,  "sec")
-        input()
