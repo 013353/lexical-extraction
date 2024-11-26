@@ -4,7 +4,7 @@ import re
 import time
 import subprocess
 import os
-# import scraper_tools
+import scraper_tools
 
 num_pages = 24
 
@@ -41,6 +41,10 @@ for result_page_num in range(1, num_pages + 1):
             
             page_soup = BeautifulSoup(requests.get(result_text_url + "&seq=" + str(page_num)).text, "html.parser")
             
+            if page_num == 1:
+                doc_title = page_soup.find("span", attrs={"property": "dc:title"}).string
+                doc_year = re.search(r"\b\d{4}", page_soup.find("span", attrs={"property": "dc:publisher"}).string)
+            
             # with open("log.txt", 'a') as file:
             #     file.write("----------------------------------------------------------------------------------------------\n" + page_soup.prettify())
             
@@ -70,5 +74,9 @@ for result_page_num in range(1, num_pages + 1):
             print(page_text)
             print("page added", page_num)
         print(doc_text)
+        
+        doc_file = open(f"Documents/{scraper_tools.format_name(doc_title)} %{doc_year}.txt", "w")
+        doc_file.write(doc_text)
+        
         print(time.time()-start_time)
         # print(scraper_tools.colors.HEADER, f"{counter}/{len(documents)}", scraper_tools.colors.ENDC, time.time()-start_time,  "sec")
