@@ -43,7 +43,7 @@ for result_page_num in range(1, num_pages + 1):
             
             if page_num == 1:
                 doc_title = page_soup.find("span", attrs={"property": "dc:title"}).string
-                doc_year = re.search(r"\b\d{4}", page_soup.find("span", attrs={"property": "dc:publisher"}).string)
+                doc_year = re.search(r"\b\d{4}", page_soup.find("span", attrs={"property": "dc:publisher"}).string).group(0)
             
             # with open("log.txt", 'a') as file:
             #     file.write("----------------------------------------------------------------------------------------------\n" + page_soup.prettify())
