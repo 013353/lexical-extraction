@@ -84,3 +84,5 @@ for result_page_num in range(1, num_pages + 1):
             
             print(time.time()-start_time)
             print(scraper_tools.colors.HEADER, f"{counter}/2304", scraper_tools.colors.ENDC, time.time()-start_time,  "sec")
+            
+print(scraper_tools.colors.OKGREEN, "DONE", scraper_tools.colors.ENDC)
