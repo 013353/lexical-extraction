@@ -7,6 +7,9 @@ os.chdir(documents_dir)
 
 documents = os.listdir()
 
+file = open("doc_data.csv", "w")
+file.write("filepath,title,year")
+
 for doc in documents:
     if doc.endswith(".txt"):
         doc_text = open(doc).read()
