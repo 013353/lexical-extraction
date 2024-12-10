@@ -19,70 +19,63 @@ for result_page_num in range(1, num_pages + 1):
     
     for result in search_results:
         start_time = time.time()
-        counter += 1
-        # i didn't want to have to do this
-        if counter >= 357:
+        result_button = result.find("a")
+        
+        result_catalog_url = "https://catalog.hathitrust.org" + result_button["href"]
+        
+        result_text_url = "https:" + \
+            BeautifulSoup(requests.get(result_catalog_url).text, "html.parser")\
+            .find("span", string="Full view")\
+            .parent\
+            ["href"]\
+            .replace("pt?", "ssd?")
+
+        doc_text = ""
+        breakout = False
+        page_num = 0
+        
+        while not breakout:
             try:
-                result_button = result.find("a")
+                page_num += 1
                 
-                result_catalog_url = "https://catalog.hathitrust.org" + result_button["href"]
+                page_soup = BeautifulSoup(requests.get(result_text_url + "&seq=" + str(page_num)).text, "html.parser")
                 
-                result_text_url = "https:" + \
-                    BeautifulSoup(requests.get(result_catalog_url).text, "html.parser")\
-                    .find("span", string="Full view")\
-                    .parent\
-                    ["href"]\
-                    .replace("pt?", "ssd?")
+                if page_num == 1:
+                    doc_title = page_soup.find("span", attrs={"property": "dc:title"}).string
+                    doc_year = re.search(r"\b\d{4}", page_soup.find("span", attrs={"property": "dc:publisher"}).string).group(0)
+                
+                paragraphs = page_soup.find_all("p")
+                
+                last_page = False
+                
+                for para in paragraphs:
+                    if (para.strings != []):
+                        for string in para.strings:
+                            if re.search(re.compile("This is the last page"), string):
+                                last_page = True
+            
+                if last_page:
+                    # print("last page")
+                    breakout = True
+                    break
+                elif page_soup.find("div", id="mdpTextEmpty"):
+                    # print("page skipped")
+                    continue
+
+                page_text = page_soup.find("p", class_="Text").contents[0] + "\n"
+                doc_text += page_text
+
+                print(page_num)
+            # There are so many things that can go wrong and I am not going to write an exception for them all
+            # I don't need all the documents anyway
             except Exception as e:
                 print(e)
-                continue
-            
-            doc_text = ""
-            breakout = False
-            page_num = 0
-            
-            while not breakout:
-                try:
-                    page_num += 1
-                    
-                    page_soup = BeautifulSoup(requests.get(result_text_url + "&seq=" + str(page_num)).text, "html.parser")
-                    
-                    if page_num == 1:
-                        doc_title = page_soup.find("span", attrs={"property": "dc:title"}).string
-                        doc_year = re.search(r"\b\d{4}", page_soup.find("span", attrs={"property": "dc:publisher"}).string).group(0)
-                    
-                    paragraphs = page_soup.find_all("p")
-                    
-                    last_page = False
-                    
-                    for para in paragraphs:
-                        if (para.strings != []):
-                            for string in para.strings:
-                                if re.search(re.compile("This is the last page"), string):
-                                    last_page = True
-                
-                    if last_page:
-                        # print("last page")
-                        breakout = True
-                        break
-                    elif page_soup.find("div", id="mdpTextEmpty"):
-                        # print("page skipped")
-                        continue
+                time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(time.time()))
+        
+        doc_file = open(f"Documents/{scraper_tools.format_name(doc_title)} %{doc_year}.txt", "w")
+        doc_file.write(doc_text)
+        
+        print(time.time()-start_time)
+        print(scraper_tools.colors.HEADER, f"{counter}/2304", scraper_tools.colors.ENDC, time.time()-start_time,  "sec")
 
-                    page_text = page_soup.find("p", class_="Text").contents[0] + "\n"
-                    doc_text += page_text
-
-                    print(page_num)
-                # There are so many things that can go wrong and I am not going to write an exception for them all
-                # I don't need all the documents anyway
-                except Exception as e:
-                    print(e)
-                    time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(time.time()))
-            
-            doc_file = open(f"Documents/{scraper_tools.format_name(doc_title)} %{doc_year}.txt", "w")
-            doc_file.write(doc_text)
-            
-            print(time.time()-start_time)
-            print(scraper_tools.colors.HEADER, f"{counter}/2304", scraper_tools.colors.ENDC, time.time()-start_time,  "sec")
-            
 print(scraper_tools.colors.OKGREEN, "DONE", scraper_tools.colors.ENDC)
