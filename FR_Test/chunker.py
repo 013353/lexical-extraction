@@ -1,14 +1,14 @@
 import os
 
-def is_paragraph(para):
+def is_long(para):
     return len(para) > 10 and len(para.split()) > 2
 
 
 def chunk_paragraphs(filepath):
     if os.path.isfile(filepath):
-        with open(filepath) as doc:
+        with open(filepath, encoding="utf-8") as doc:
             doc_lines = doc.readlines()
-            print(doc_lines)
+            # print(doc_lines)
             # doc_lines = doc_text.splitlines()
 
             doc_paragraphs = []
@@ -17,21 +17,37 @@ def chunk_paragraphs(filepath):
             for line in doc_lines:
                 ln = line.replace("\n", "")
                 if ln == "" and cur_paragraph != "":
-                    if is_paragraph(cur_paragraph):
+                    if is_long(cur_paragraph):
                         doc_paragraphs.append(cur_paragraph)
                     cur_paragraph = ""
                 else:
                     if cur_paragraph != "":
                         cur_paragraph += "\n"
                     cur_paragraph += ln
-            if is_paragraph(cur_paragraph):
-                doc_paragraphs.append(cur_paragraph)                  
-    return doc_paragraphs
+            if is_long(cur_paragraph):
+                doc_paragraphs.append(cur_paragraph)             
+            return doc_paragraphs
+    else:
+        raise Exception("Filepath does not lead to a file.")
+
+def chunk_sentences(filepath):
+    if os.path.isfile(filepath):
+        with open(filepath, encoding="utf-8") as doc:
+            doc_lines = doc.read_lines()
+            
+            doc_sentences = []
+            
+            for line in doc_lines:
+                # DO SOMETHING HERE AT SOME POINT
+                pass
+    else:
+        raise Exception("Filepath does not lead to a file.")
+            
 
 def chunk_file(filepath, size=1):
     paragraphs = chunk_paragraphs(filepath)
     
-    print(paragraphs)
+    # print(paragraphs)
     
     chunk = ""
     counter = 1
