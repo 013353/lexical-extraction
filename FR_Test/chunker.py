@@ -1,4 +1,5 @@
 import os
+import re
 
 def is_long(para):
     return len(para) > 10 and len(para.split()) > 2
@@ -33,15 +34,20 @@ def chunk_paragraphs(filepath):
 def chunk_sentences(filepath):
     if os.path.isfile(filepath):
         with open(filepath, encoding="utf-8") as doc:
-            doc_lines = doc.read_lines()
+            doc_lines = doc.readlines()
             
             doc_sentences = []
             
-            for line in doc_lines:
-                # DO SOMETHING HERE AT SOME POINT
-                pass
+            for i in range(len(doc_lines)):
+                if doc_lines[i] != "\n":
+                    sents = re.split(r"([!\.?])", doc_lines[i])
+                    print(sents)
+                    input()
+                
     else:
         raise Exception("Filepath does not lead to a file.")
+
+chunk_sentences("Documents/The philosophy of history_ by Georg Wilhelm Friedrich Hegel; with prefaces by Charles Hegel and the translator_ J_ Sibree_ M_A__  _  %1900.txt")
             
 
 def chunk_file(filepath, size=1):
