@@ -9,8 +9,6 @@ def chunk_paragraphs(filepath):
     if os.path.isfile(filepath):
         with open(filepath, encoding="utf-8") as doc:
             doc_lines = doc.readlines()
-            # print(doc_lines)
-            # doc_lines = doc_text.splitlines()
 
             doc_paragraphs = []
 
@@ -46,14 +44,10 @@ def chunk_sentences(filepath):
                 i += 2
     else:
         raise Exception("Filepath does not lead to a file.")
-
-chunk_sentences("Documents/The philosophy of history, by Georg Wilhelm Friedrich Hegel_ with prefaces by Charles Hegel and the translator, J_ Sibree, M_A_,  _ _1900 (1).txt")
             
 
 def chunk_file(filepath, size=1):
     paragraphs = chunk_paragraphs(filepath)
-    
-    # print(paragraphs)
     
     chunk = ""
     counter = 1
