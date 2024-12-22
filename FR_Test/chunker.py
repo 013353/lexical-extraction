@@ -44,7 +44,6 @@ def chunk_sentences(filepath):
             while i < len(split_doc)-1:
                 doc_sentences.append(split_doc[i] + split_doc[i+1])
                 i += 2
-            print(doc_sentences)
     else:
         raise Exception("Filepath does not lead to a file.")
 
