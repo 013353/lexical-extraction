@@ -1,7 +1,7 @@
 import re
 
 def format_name(name):
-    return re.sub(r"[\/\.\<\>|\:&\",]", "_", name)[:150]
+    return re.sub(r"[\/\.\<\>|\:&\"]", "_", name)[:150]
 
 class colors:
     HEADER = '\033[95m'
