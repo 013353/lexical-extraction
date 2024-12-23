@@ -69,9 +69,9 @@ def chunk_paragraphs(filepath):
         raise Exception("Filepath does not lead to a file.")
           
 
-def chunk_file(filepath, size):
+def chunk_file(filepath, mode, size):
     
-    match size:
+    match mode:
         case "sentence":
             return chunk_sentences(filepath)
         case "paragraph":
@@ -90,5 +90,5 @@ def chunk_file(filepath, size):
                 counter += 1
                 
             return chunks
-        case _:
+        case "word":
             return chunk_words(filepath, size)
