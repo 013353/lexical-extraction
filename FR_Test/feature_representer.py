@@ -6,20 +6,14 @@ import torch
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
 from transformers import BertTokenizerFast
+import scipy.sparse
 import pandas as pd
 from chunker import chunk_file
 from tqdm import tqdm
 
 print("DONE!")
 
-data_df = pd.read_csv("Documents/_doc_data.csv")
-
-dev = "cuda:0" if torch.cuda.is_available() else "cpu"
-print("Platform:", dev)
-
-train, test = train_test_split(data_df, test_size=0.2)
-
-vectorizer = TfidfVectorizer()
+PERIOD_LENGTH = 10
 
 def inverse_tf_idf(corpus):
     string_corpus = []
@@ -28,25 +22,18 @@ def inverse_tf_idf(corpus):
         for token in doc:
             doc_string += str(token) if len(doc_string) == 0 else " " + str(token)
         string_corpus.append(doc_string)
-    
-    tfidf_vector = vectorizer.fit_transform(string_corpus)
-    
-    tfidf_df = pd.DataFrame(tfidf_vector.toarray(), columns=vectorizer.get_feature_names_out())
+
+    tfidf_df = pd.DataFrame(vectorizer.fit_transform(string_corpus).toarray(), columns=vectorizer.get_feature_names_out())
     
     token_df = tfidf_df.transpose()
     
     weights = {}
-    for token, data in tqdm(token_df.iterrows(), total=len(token_df.index), desc="Averaging"):
+    for token, data in token_df.iterrows():
         weights[token] = np.mean(data)
     
     weights_df = pd.DataFrame.from_dict(weights, orient='index', columns=["weight"])
     
     sorted_weights_df = weights_df.sort_values(by=weights_df.columns[0], axis=0, ascending=False)
-    
-    # print(sorted_weights_df)
-    
-    # print(list(sorted_weights_df.index.values)[:5])
-    # print(bert.convert_ids_to_tokens(list(sorted_weights_df.index.values)[:5]))
     
     weights_x = []
     
@@ -55,19 +42,6 @@ def inverse_tf_idf(corpus):
     
     weights_mean = np.mean(range(len(weights_x)))
     weights_std = np.std(range(len(weights_x)))
-    
-    # print("STDEV:", weights_std)
-    # print("MEAN:", weights_mean)
-    
-    # figure, axis = plt.subplots(2, 1)
-    
-    # x = []
-    # y = []
-    # for i, row in sorted_weights_df.iterrows():
-    #     x.append(i)
-    #     y.append(row["weight"])
-        
-    # axis[0].plot(x, y)
     
     def bell_curve(x, std, mean, mult=1):
         return mult/(std * np.sqrt(2 * np.pi)) * np.e**( - (x - mean)**2 / (2 * std**2))
@@ -82,38 +56,55 @@ def inverse_tf_idf(corpus):
     for index, row in sorted_weights_df.iterrows():
         sorted_weights_df.at[index, "weight"] *= mult
     
-    # print(min(list(sorted_weights_df["weight"])))
-        
-    # x2 = range(sorted_weights_df.shape[0])
-    # y2 = []
-    # for i, row in sorted_weights_df.iterrows():
-    #     y2.append(row["weight"])
-        
-    # print(sorted_weights_df)
-    
-    # axis[1].plot(x2, y2, color="r")
-    # plt.show()
+    return sorted_weights_df
     
 def tokenize(dataset, mode, size, model):
     chunks = []
     
-    for i, row in tqdm(dataset.iterrows(), total=len(dataset.index), desc="Chunking"):
+    for i, row in dataset.iterrows():
         chunks.append(chunk_file(row["filepath"], mode, size))
     
     tokenized_chunks = []
     
-    for doc in tqdm(chunks, desc="Tokenizing"):
+    for doc in chunks:
         for chunk in doc:
             tokenized_chunk = model.encode(chunk)
             tokenized_chunks.append(tokenized_chunk)
 
     return tokenized_chunks
 
-train_tokens = test_tokens = []
+def separate_periods(df):
+    periods = {}
+    docs_df = df.sort_values(by="year")
+    print(docs_df)
+    for index, row in tqdm(docs_df.iterrows(), total=len(docs_df.index), desc="Separating Documents"):
+        period = int(PERIOD_LENGTH * np.floor(row["year"]/PERIOD_LENGTH))
+        if not period in periods:
+            periods[period] = pd.DataFrame(columns=["filepath", "title", "year"])
+        r = pd.DataFrame(row).transpose()
+        periods[period].loc[len(periods[period])] = r.iloc[0]
+
+    return periods
+
+
+
+data_df = pd.read_csv("Documents/_doc_data.csv")
+
+dev = "cuda:0" if torch.cuda.is_available() else "cpu"
+print("Platform:", dev)
+
+train, test = train_test_split(data_df, test_size=0.9)
+
+vectorizer = TfidfVectorizer()
+
+profiles = {}
 
 bert = BertTokenizerFast.from_pretrained("google-bert/bert-base-uncased")
 
-for group, dataset in [(train_tokens, train), (test_tokens, test)]:
-    group += tokenize(dataset, "sentence", 1, bert)
-    
-inverse_tf_idf(train_tokens)
+for key, value in tqdm(separate_periods(train).items(), desc="Generating Profiles"):
+
+    train_tokens = tokenize(value, "sentence", 1, bert)
+
+    profiles[key] = inverse_tf_idf(train_tokens)
+
+print(profiles)
