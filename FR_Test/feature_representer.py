@@ -1,31 +1,29 @@
-print("Importing packages... ", end="")
+print("Importing packages... ")
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from sklearn.model_selection import train_test_split
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from transformers import BertTokenizerFast
 import scipy.sparse
 import pandas as pd
 from chunker import chunk_file
 from tqdm import tqdm
 
-print("DONE!")
+print("\rDONE!")
 
 PERIOD_LENGTH = 10
 
-def inverse_tf_idf(corpus):
+def generate_profile(corpus, vectorizer):
     string_corpus = []
     for doc in corpus:
         doc_string = ""
         for token in doc:
             doc_string += str(token) if len(doc_string) == 0 else " " + str(token)
         string_corpus.append(doc_string)
-
-    tfidf_df = pd.DataFrame(vectorizer.fit_transform(string_corpus).toarray(), columns=vectorizer.get_feature_names_out())
     
-    token_df = tfidf_df.transpose()
+    token_df = pd.DataFrame.sparse.from_spmatrix(vectorizer.fit_transform(string_corpus), columns=vectorizer.get_feature_names_out()).transpose()
     
     weights = {}
     for token, data in token_df.iterrows():
@@ -93,9 +91,10 @@ data_df = pd.read_csv("Documents/_doc_data.csv")
 dev = "cuda:0" if torch.cuda.is_available() else "cpu"
 print("Platform:", dev)
 
-train, test = train_test_split(data_df, test_size=0.9)
+train, test = train_test_split(data_df, train_size=0.5)
 
-vectorizer = TfidfVectorizer()
+tfidf_vec = TfidfVectorizer()
+count_vec = CountVectorizer()
 
 profiles = {}
 
@@ -105,6 +104,9 @@ for key, value in tqdm(separate_periods(train).items(), desc="Generating Profile
 
     train_tokens = tokenize(value, "sentence", 1, bert)
 
-    profiles[key] = inverse_tf_idf(train_tokens)
+    profiles[key] = generate_profile(train_tokens, tfidf_vec)
+    
+for key, value in tqdm(test.iterrows(), total=len(test.index), desc="Evaluating Test Data"):
+    pass
 
 print(profiles)
