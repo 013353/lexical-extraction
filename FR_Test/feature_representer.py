@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
-from transformers import BertTokenizerFast
+from transformers import BertTokenizerFast, BertModel
 import scipy.sparse
 import pandas as pd
 from chunker import chunk_file
@@ -15,7 +15,7 @@ print("\rDONE!")
 
 PERIOD_LENGTH = 10
 
-def generate_profile(corpus, vectorizer):
+def generate_profile(corpus, vectorizer, model):
     string_corpus = []
     for doc in corpus:
         doc_string = ""
@@ -53,6 +53,8 @@ def generate_profile(corpus, vectorizer):
     
     for index, row in sorted_weights_df.iterrows():
         sorted_weights_df.at[index, "weight"] *= mult
+        
+    # TODO apply sorted_weights_df to each document in corpus, return result
     
     return sorted_weights_df
     
@@ -66,7 +68,7 @@ def tokenize(dataset, mode, size, model):
     
     for doc in chunks:
         for chunk in doc:
-            tokenized_chunk = model.encode(chunk)
+            tokenized_chunk = model.encode(chunk, return_tensors="pt", padding='max_length', truncation=True, max_length=512)
             tokenized_chunks.append(tokenized_chunk)
 
     return tokenized_chunks
@@ -89,7 +91,7 @@ def separate_periods(df):
 data_df = pd.read_csv("Documents/_doc_data.csv")
 
 dev = "cuda:0" if torch.cuda.is_available() else "cpu"
-print("Platform:", dev)
+print("Device:", dev)
 
 train, test = train_test_split(data_df, train_size=0.5)
 
@@ -98,15 +100,20 @@ count_vec = CountVectorizer()
 
 profiles = {}
 
-bert = BertTokenizerFast.from_pretrained("google-bert/bert-base-uncased")
+bert_tokenizer = BertTokenizerFast.from_pretrained("google-bert/bert-base-uncased")
+# bert_tokenizer.to(dev)
+bert_model = BertModel.from_pretrained("google-bert/bert-base-uncased")
 
 for key, value in tqdm(separate_periods(train).items(), desc="Generating Profiles"):
 
-    train_tokens = tokenize(value, "sentence", 1, bert)
+    train_tokens = tokenize(value, "sentence", 1, bert_tokenizer)
 
-    profiles[key] = generate_profile(train_tokens, tfidf_vec)
+    profiles[key] = generate_profile(train_tokens, tfidf_vec, bert_model)
     
+# TODO feed each weighted document into model, "graph", run SVM    
+
 for key, value in tqdm(test.iterrows(), total=len(test.index), desc="Evaluating Test Data"):
+    # TODO tokenize, feed into model, "graph", feed into SVM
     pass
 
 print(profiles)
