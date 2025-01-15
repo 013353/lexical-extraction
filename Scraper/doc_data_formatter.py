@@ -55,7 +55,7 @@ def add_files_to_csv(dir):
                 doc_title_split = re.split(r'[.%]', doc)
                 doc_title = doc_title_split[0]
                 doc_year = re.search(r"\d{4}", doc_title_split[-2]).group(0)
-                with open(f"{dir}/_doc_data.csv", "a") as file:
+                with open(f"{dir}/_doc_data.csv", "a", encoding="utf-8") as file:
                     file.write(f"\n\"{dir}/{doc}\",\"{doc_title}\",{doc_year}")
             except Exception as e:
                 print(e)
@@ -79,3 +79,5 @@ def format_files(dir):
             
             with open(filepath, "w", encoding="utf-8") as write_file:
                 write_file.write(formatted_doc)
+                
+add_files_to_csv("Documents")

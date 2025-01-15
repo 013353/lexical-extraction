@@ -2,16 +2,18 @@ print("Importing packages... ")
 
 import matplotlib.pyplot as plt
 import numpy as np
-import torch
+import pandas as pd
+from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from transformers import BertTokenizerFast, BertModel
-import scipy.sparse
-import pandas as pd
+import torch
+# import scipy.sparse
+import copy
 from chunker import chunk_file
-from tqdm import tqdm
 
 print("\rDONE!")
+
 
 PERIOD_LENGTH = 10
 
@@ -22,8 +24,14 @@ def generate_profile(corpus, vectorizer, model):
         for token in doc:
             doc_string += str(token) if len(doc_string) == 0 else " " + str(token)
         string_corpus.append(doc_string)
+        
+    arr = vectorizer.fit_transform(string_corpus).toarray()
     
-    token_df = pd.DataFrame.sparse.from_spmatrix(vectorizer.fit_transform(string_corpus), columns=vectorizer.get_feature_names_out()).transpose()
+    token_df = pd.DataFrame(columns=vectorizer.get_feature_names_out())
+    
+    for row in arr:
+        token_df.loc[len(token_df.index)] = row
+    
     
     weights = {}
     for token, data in token_df.iterrows():
@@ -53,9 +61,17 @@ def generate_profile(corpus, vectorizer, model):
     
     for index, row in sorted_weights_df.iterrows():
         sorted_weights_df.at[index, "weight"] *= mult
-        
-    # TODO apply sorted_weights_df to each document in corpus, return result
     
+    sorted_weights_df = sorted_weights_df.sort_values(by=weights_df.columns[0], axis=0, ascending=False)
+    
+    for i, row in sorted_weights_df.iterrows():
+        print(bert_tokenizer.convert_ids_to_tokens(i), row["weight"])
+        
+    q1 = sorted_weights_df.quantile(0.25)
+    q3 = sorted_weights_df.quantile(0.75)
+    
+    print(q1, q3)
+
     return sorted_weights_df
     
 def tokenize(dataset, mode, size, model):
@@ -68,7 +84,7 @@ def tokenize(dataset, mode, size, model):
     
     for doc in chunks:
         for chunk in doc:
-            tokenized_chunk = model.encode(chunk, return_tensors="pt", padding='max_length', truncation=True, max_length=512)
+            tokenized_chunk = model.encode(chunk)
             tokenized_chunks.append(tokenized_chunk)
 
     return tokenized_chunks
@@ -93,7 +109,7 @@ data_df = pd.read_csv("Documents/_doc_data.csv")
 dev = "cuda:0" if torch.cuda.is_available() else "cpu"
 print("Device:", dev)
 
-train, test = train_test_split(data_df, train_size=0.5)
+train, test = train_test_split(data_df, train_size=0.2)
 
 tfidf_vec = TfidfVectorizer()
 count_vec = CountVectorizer()
@@ -110,7 +126,10 @@ for key, value in tqdm(separate_periods(train).items(), desc="Generating Profile
 
     profiles[key] = generate_profile(train_tokens, tfidf_vec, bert_model)
     
-# TODO feed each weighted document into model, "graph", run SVM    
+    # TODO apply sorted_weights_df to each document in corpus, return result
+    # TODO feed each weighted document into model, "graph", run SVM
+
+
 
 for key, value in tqdm(test.iterrows(), total=len(test.index), desc="Evaluating Test Data"):
     # TODO tokenize, feed into model, "graph", feed into SVM
