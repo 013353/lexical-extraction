@@ -32,7 +32,6 @@ def generate_profile(corpus, vectorizer, model):
     for row in arr:
         token_df.loc[len(token_df.index)] = row
     
-    
     weights = {}
     for token, data in token_df.iterrows():
         weights[token] = np.mean(data)
@@ -67,12 +66,18 @@ def generate_profile(corpus, vectorizer, model):
     for i, row in sorted_weights_df.iterrows():
         print(bert_tokenizer.convert_ids_to_tokens(i), row["weight"])
         
-    q1 = sorted_weights_df.quantile(0.25)
-    q3 = sorted_weights_df.quantile(0.75)
+    q1 = sorted_weights_df.quantile(0.25)["weight"]
+    q3 = sorted_weights_df.quantile(0.75)["weight"]
     
     print(q1, q3)
+    print(sorted_weights_df)
+    print(sorted_weights_df["weight"])
+    iqr_weights = sorted_weights_df[sorted_weights_df["weight"] < q3]
+    iqr_weights = iqr_weights[iqr_weights["weight"] > q1]
+    
+    print(iqr_weights)
 
-    return sorted_weights_df
+    return iqr_weights
     
 def tokenize(dataset, mode, size, model):
     chunks = []
