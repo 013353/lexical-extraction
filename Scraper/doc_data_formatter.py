@@ -5,27 +5,27 @@ import pandas as pd
 import random
 import matplotlib.pyplot as plt
 from shutil import copy2
+import numpy as np
 
-def choose_documents(start, end):
+def choose_documents(parent_dir, child_dir, period_length: int, start: int, end:int, limit=150):
     bar = tqdm(desc="Choosing Documents")
 
-    files = pd.read_csv(f"{start}/_doc_data.csv").sort_values(by="year")
+    files = pd.read_csv(f"{parent_dir}/_doc_data.csv").sort_values(by="year")
 
-    years = {}
+    periods = {}
 
     for i, row in files.iterrows():
         bar.update()
-        period = int(str(row["year"])[:3] + "0")
-        if period in years:
-            years[period].append(row)
-        else:
-            years[period] = [row]
-
-    limit = 150
+        period = int(period_length * np.floor(row["year"]/period_length))
+        if start <= period <= end:
+            if period in periods:
+                periods[period].append(row)
+            else:
+                periods[period] = [row]
 
     used_docs = []
 
-    for key, value in years.items():
+    for key, value in periods.items():
         bar.update()
         if len(value) > limit:
             random.shuffle(value)
@@ -39,7 +39,7 @@ def choose_documents(start, end):
 
     for i, row in used_docs.iterrows():
         bar.update()
-        copy2(row["filepath"], f"{end}/{row["title"]} %{row["year"]}.txt")
+        copy2(row["filepath"], f"{child_dir}/{row["title"]} %{row["year"]}.txt")
 
 def add_files_to_csv(dir):
     file = open(f"{dir}/_doc_data.csv", "w")
@@ -79,5 +79,7 @@ def format_files(dir):
             
             with open(filepath, "w", encoding="utf-8") as write_file:
                 write_file.write(formatted_doc)
-                
-add_files_to_csv("Documents")
+
+# add_files_to_csv("Documents/All Documents")
+# choose_documents("Documents/All Documents", "Documents", 10, 1700, 2020)
+# add_files_to_csv("Documents")
