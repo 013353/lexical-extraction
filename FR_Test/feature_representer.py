@@ -6,6 +6,7 @@ import pandas as pd
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
+from sklearn.svm import SVC
 from transformers import BertTokenizerFast, BertModel
 import torch
 # import scipy.sparse
@@ -17,7 +18,7 @@ print("\rDONE!")
 
 PERIOD_LENGTH = 10
 
-def generate_profile(corpus, vectorizer, model):
+def generate_profile(corpus, vectorizer):
     string_corpus = []
     for doc in corpus:
         doc_string = ""
@@ -61,23 +62,21 @@ def generate_profile(corpus, vectorizer, model):
     for index, row in sorted_weights_df.iterrows():
         sorted_weights_df.at[index, "weight"] *= mult
     
-    sorted_weights_df = sorted_weights_df.sort_values(by=weights_df.columns[0], axis=0, ascending=False)
+    sorted_weights_df = sorted_weights_df.sort_values(by=sorted_weights_df.columns[0], axis=0, ascending=False)
     
     for i, row in sorted_weights_df.iterrows():
         print(bert_tokenizer.convert_ids_to_tokens(i), row["weight"])
         
-    q1 = sorted_weights_df.quantile(0.25)["weight"]
-    q3 = sorted_weights_df.quantile(0.75)["weight"]
+    bottom = sorted_weights_df.quantile(0.125)["weight"]
+    top = sorted_weights_df.quantile(0.875)["weight"]
     
-    print(q1, q3)
-    print(sorted_weights_df)
-    print(sorted_weights_df["weight"])
-    iqr_weights = sorted_weights_df[sorted_weights_df["weight"] < q3]
-    iqr_weights = iqr_weights[iqr_weights["weight"] > q1]
+    middle_weights = sorted_weights_df[sorted_weights_df["weight"] < top]
+    middle_weights = middle_weights[middle_weights["weight"] > bottom]
     
-    print(iqr_weights)
+    middle_ids = list(middle_weights.index)
 
-    return iqr_weights
+    return middle_ids
+
     
 def tokenize(dataset, mode, size, model):
     chunks = []
@@ -93,6 +92,7 @@ def tokenize(dataset, mode, size, model):
             tokenized_chunks.append(tokenized_chunk)
 
     return tokenized_chunks
+
 
 def separate_periods(df):
     periods = {}
@@ -114,30 +114,43 @@ data_df = pd.read_csv("Documents/_doc_data.csv")
 dev = "cuda:0" if torch.cuda.is_available() else "cpu"
 print("Device:", dev)
 
-train, test = train_test_split(data_df, train_size=0.2)
+train, test = train_test_split(data_df, train_size=0.01)
 
 tfidf_vec = TfidfVectorizer()
 count_vec = CountVectorizer()
 
-profiles = {}
 
 bert_tokenizer = BertTokenizerFast.from_pretrained("google-bert/bert-base-uncased")
 # bert_tokenizer.to(dev)
-bert_model = BertModel.from_pretrained("google-bert/bert-base-uncased")
+bert_model = BertModel.from_pretrained("google-bert/bert-base-uncased").to(dev)
+
+train_docs = pd.DataFrame(columns=["doc", "mask", "period"])
+
+print(train_docs)
 
 for key, value in tqdm(separate_periods(train).items(), desc="Generating Profiles"):
 
-    train_tokens = tokenize(value, "sentence", 1, bert_tokenizer)
+    tokenized_period = tokenize(value, "sentence", 1, bert_tokenizer)
 
-    profiles[key] = generate_profile(train_tokens, tfidf_vec, bert_model)
+    profile = tqdm(generate_profile(tokenized_period, tfidf_vec))
+
+    for doc in tokenized_period:
+        mask = []
+        for id in doc:
+            mask.append(1 if id in profile else 0)
+        print(mask)
+        # input()
+        new_row = [doc, mask, key]
+        train_docs.loc[len(train_docs)] = new_row
     
-    # TODO apply sorted_weights_df to each document in corpus, return result
-    # TODO feed each weighted document into model, "graph", run SVM
+    input(key)
+    
+    print(train_docs)
+    
+# TODO feed each weighted document into model, "graph", run SVM
 
 
 
 for key, value in tqdm(test.iterrows(), total=len(test.index), desc="Evaluating Test Data"):
     # TODO tokenize, feed into model, "graph", feed into SVM
     pass
-
-print(profiles)
