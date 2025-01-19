@@ -80,6 +80,6 @@ def format_files(dir):
             with open(filepath, "w", encoding="utf-8") as write_file:
                 write_file.write(formatted_doc)
 
-# add_files_to_csv("Documents/All Documents")
-# choose_documents("Documents/All Documents", "Documents", 10, 1700, 2020)
-# add_files_to_csv("Documents")
+add_files_to_csv("Documents/All Documents")
+choose_documents("Documents/All Documents", "Documents", 10, 1800, 2020)
+add_files_to_csv("Documents")
