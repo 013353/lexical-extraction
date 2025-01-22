@@ -8,7 +8,7 @@ def generate_profile(corpus, vectorizer, num):
             doc_string += str(token) if len(doc_string) == 0 else " " + str(token)
         string_corpus.append(doc_string)
     
-    print(num)
+    # print(num)
         
     completed = False
     while not completed:
@@ -17,41 +17,16 @@ def generate_profile(corpus, vectorizer, num):
                 completed = True
             except MemoryError:
                 time.sleep(10)
-    # print(arr)
-    # input()
-    # print(type(arr))
+
     token_df = pd.DataFrame.sparse.from_spmatrix(arr, columns=vectorizer.get_feature_names_out())
-    print(num)
-    # token_df = pd.DataFrame(arr, columns=vectorizer.get_feature_names_out())
     
-    # for i in range(arr.shape[0]):
-    #     # print(token_df)
-    #     # print(pd.DataFrame(arr.getrow(i).toarray()).loc[0])
-    #     completed = False
-    #     while not completed:
-    #         try:
-    #             token_df.loc[len(token_df.index)] = pd.DataFrame(arr.getrow(i).toarray()).loc[0]
-    #             completed = True
-    #         except MemoryError:
-    #             time.sleep(10)
-    # token_df.replace(float("nan"), 0, inplace=True)
-    
-    # print(token_df.iloc[0,0], "YES")
-    
-    # token_df.to_csv(f"{__name__}{num}.csv")
-    print(num)
-    
-    print(token_df)
+    # print(token_df)
     
     weights = {}
     for index in token_df.index.to_list():
         weights[index] = np.mean(token_df.loc[index])
     
-    print(weights)
-        
-    # for token, data in token_df.iterrows():
-    #     weights[token] = np.mean(data)
-    # completed = True
+    # print(weights)
     
     weights_df = pd.DataFrame.from_dict(weights, orient='index', columns=["weight"])
     
@@ -79,9 +54,6 @@ def generate_profile(corpus, vectorizer, num):
         sorted_weights_df.at[index, "weight"] *= mult
     
     sorted_weights_df = sorted_weights_df.sort_values(by=sorted_weights_df.columns[0], axis=0, ascending=False)
-    
-    # for i, row in sorted_weights_df.iterrows():
-    #     print(tokenizer.convert_ids_to_tokens(i), row["weight"])
         
     bottom = sorted_weights_df.quantile(0.125)["weight"]
     top = sorted_weights_df.quantile(0.875)["weight"]
@@ -91,30 +63,26 @@ def generate_profile(corpus, vectorizer, num):
     
     middle_ids = list(middle_weights.index)
     
-    # print("PROFILE GENERATED")
-    
     return middle_ids
 
-def add_inputs_to_df(period, docs, dataframe, tokenizer, vectorizer, num):
+def add_inputs_to_file(period, docs, filepath, tokenizer, vectorizer, num):
     tokenized_period = tokenize(docs, "sentence", 1, tokenizer)
 
-    profile = generate_profile(tokenized_period, vectorizer, num)
+    with open(filepath, "w") as train_docs_file:
+        train_docs_file.write("doc;mask;period")
 
-    for doc in tokenized_period:
-        mask = []
-        for id in doc:
-            mask.append(1 if id in profile else 0)
-        # print(mask)
-        new_row = [doc, mask, period]
-        dataframe.loc[len(dataframe)] = new_row
+    profile = generate_profile(tokenized_period, vectorizer, num)
+    with open(filepath, "a") as file:
+        for doc in tokenized_period:
+            mask = []
+            for id in doc:
+                mask.append(1 if id in profile else 0)
+            # print(mask)
+            # new_row = [doc, mask, period]
+            # dataframe.loc[len(dataframe)] = new_row
+            file.write(f"\n{doc};{mask};{period}")
     
     print("PROCESS DONE")
-    
-    # print(bert_tokenizer.convert_ids_to_tokens(profile))
-    
-    # print(period)
-    
-    # print(dataframe)
 
     
 def tokenize(dataset, mode, size, model):
@@ -159,6 +127,21 @@ def separate_periods(df):
 
     return periods
 
+
+def get_accuracy(estimate, expected):
+    """
+    RETURNS TUPLE:
+    (`acc`, `acc@3`, `acc@5`)
+    """
+    #TODO F1 score
+    acc, acc_3, acc_5 = False
+    if estimate == expected: acc = True
+    if expected-PERIOD_LENGTH <= estimate <= expected+PERIOD_LENGTH: acc_3 = True
+    if expected-2*PERIOD_LENGTH <= estimate <= expected+2*PERIOD_LENGTH: acc_5 = True
+    
+    return acc, acc_3, acc_5
+
+
 if __name__ == "__main__":
     print("Importing packages... ")
 
@@ -171,7 +154,7 @@ while not completed:
         from tqdm import tqdm
         from sklearn.model_selection import train_test_split
         from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
-        from sklearn.svm import SVC
+        from sklearn.svm import LinearSVC
         from transformers import BertTokenizerFast, BertModel
         from transformers.utils import logging
         import torch
@@ -196,34 +179,35 @@ if __name__ == "__main__":
     dev = "cuda:0" if torch.cuda.is_available() else "cpu"
     print("Device:", dev)
 
-    train, test = train_test_split(data_df, train_size=0.1)
+    train, test = train_test_split(data_df, train_size=0.01)
+    # print(test)
 
     tfidf_vec = TfidfVectorizer()
     count_vec = CountVectorizer()
 
 
     bert_tokenizer = BertTokenizerFast.from_pretrained("google-bert/bert-base-uncased")
-    # bert_tokenizer.to(dev)
     bert_model = BertModel.from_pretrained("google-bert/bert-base-uncased").to(dev)
-
-    train_docs = pd.DataFrame(columns=["doc", "mask", "period"])
-
-    print(train_docs)
 
     processes = []
 
-    i=2
+    i=0
     
     for key, value in tqdm(separate_periods(train).items(), desc="Generating Profiles"):
-        process = mp.Process(target=add_inputs_to_df, args=(key, value, train_docs, bert_tokenizer, tfidf_vec, i))
-        process.daemon = True
+        process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/train_docs_{i}.csv", bert_tokenizer, tfidf_vec, i))
+        # process.daemon = True
         processes.append(process)
         process.start()
         i+=1
-        # process.join()
-        
-    for proc in processes:
-        proc.join()
+    
+    train_docs = pd.DataFrame(columns=["doc", "mask", "period"])
+    
+    for index in range(len(processes)):
+        processes[index].join()
+        df = pd.read_csv(f"FR_Test/train_docs_{index}.csv", sep=";")
+        train_docs = pd.concat([train_docs, df], ignore_index=True)
+    
+    # train_docs = pd.read_csv("FR_Test/train_docs.csv", sep=";")
         
     def match_lengths(col):
         series = train_docs.loc[:, col]
@@ -231,20 +215,27 @@ if __name__ == "__main__":
         for i in series:
             if len(i) > max: max = len(i)
         
-        for i in range(len(series)):
-            train_docs.at[i, col] = train_docs.at[i, col][:512] + [0]*(512-len(train_docs.at[i, col]))
+        for i in tqdm(range(len(series)), leave=False):
+            train_docs.at[i, col] = eval(train_docs.at[i, col])[:512] + [0]*(512-len(train_docs.at[i, col]))
+            # print(train_docs)
 
     match_lengths("doc")
     match_lengths("mask")
 
-    outputs = pd.DataFrame(columns=["output", "period"])
+    # outputs = pd.DataFrame(columns=["output", "period"])
 
+    print(train_docs)
     train_docs = train_docs.sample(frac=1).reset_index(drop=True)
     print(train_docs)
 
-    BATCH_SIZE = 32
-    NUM_BATCHES  = np.ceil(len(train_docs.index)/BATCH_SIZE)
-    for i in range(NUM_BATCHES):
+    svm = LinearSVC()
+    
+    outputs = []
+    periods = []
+
+    BATCH_SIZE = 512
+    NUM_BATCHES_TRAIN  = int(np.ceil(len(train_docs.index)/BATCH_SIZE))
+    for i in range(NUM_BATCHES_TRAIN):
         first = np.floor(BATCH_SIZE * i)
         last = np.floor(BATCH_SIZE * (i+1))
         
@@ -253,18 +244,49 @@ if __name__ == "__main__":
         
         print(docs)
         print(masks)
-        input()
         
-        bert_model.forward(input=docs, attention_mask=masks)
-        #TODO
-
-    print(bert_model.forward(input_ids=docs, attention_mask=masks))
-    input()
+        output = bert_model.forward(input=docs, attention_mask=masks).pooler_output.tolist()
+        print(output)
+        outputs.extend(output)
+        print(outputs)
+        for i in range(BATCH_SIZE):
+            periods.append(train_docs.loc[first+i, "period"])
+            print(train_docs.loc[first+i, "period"])
+        # outputs = np.append(outputs, output.tolist())
+        #TODO add output to a list, add corresponding period to another list, feed complete list into SVM
+        
+    svm.fit(outputs, periods)
+    
+    tokenized_test = tokenize(test, "sentence", 1, bert_tokenizer)
+    test_years = test.loc[:, "year"].tolist()
+    print(tokenized_test)
+    print(test_years)
+    
+    test_outputs = []
+    
+    NUM_BATCHES_TEST  = int(np.ceil(len(test.index)/BATCH_SIZE))
+    for i in tqdm(range(NUM_BATCHES_TEST)):
+        first = np.floor(BATCH_SIZE * i)
+        last = np.floor(BATCH_SIZE * (i+1))
+        
+        docs = torch.tensor(tokenized_test[first:last], device=dev)
+        
+        output = bert_model.forward(input=docs).pooler_output.tolist()
+        
+        test_outputs.extend(output)
+        
         
     # TODO feed each weighted document into model, "graph", run SVM
-
-
-
-    for key, value in tqdm(test.iterrows(), total=len(test.index), desc="Evaluating Test Data"):
-        # TODO tokenize, feed into model, "graph", feed into SVM
-        pass
+    estimates = svm.predict(test_outputs)
+    acc, acc_3, acc_5 = []
+    for i in tqdm(range(len(estimates))):
+        estimate = estimates.item(i)
+        expected = test_years[i]
+        accs = get_accuracy(estimate, expected)
+        acc.append(accs[0])
+        acc_3.append(accs[1])
+        acc_5.append(accs[2])
+    
+    print("Acc:", np.mean(acc))
+    print("Acc@3:", np.mean(acc_3))
+    print("Acc@5:", np.mean(acc_5))
