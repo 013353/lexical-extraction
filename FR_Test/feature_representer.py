@@ -7,8 +7,6 @@ def generate_profile(corpus, vectorizer, num):
         for token in doc:
             doc_string += str(token) if len(doc_string) == 0 else " " + str(token)
         string_corpus.append(doc_string)
-    
-    # print(num)
         
     completed = False
     while not completed:
@@ -20,13 +18,9 @@ def generate_profile(corpus, vectorizer, num):
 
     token_df = pd.DataFrame.sparse.from_spmatrix(arr, columns=vectorizer.get_feature_names_out())
     
-    # print(token_df)
-    
     weights = {}
     for index in token_df.index.to_list():
         weights[index] = np.mean(token_df.loc[index])
-    
-    # print(weights)
     
     weights_df = pd.DataFrame.from_dict(weights, orient='index', columns=["weight"])
     
@@ -77,12 +71,7 @@ def add_inputs_to_file(period, docs, filepath, tokenizer, vectorizer, num):
             mask = []
             for id in doc:
                 mask.append(1 if id in profile else 0)
-            # print(mask)
-            # new_row = [doc, mask, period]
-            # dataframe.loc[len(dataframe)] = new_row
             file.write(f"\n{doc};{mask};{period}")
-    
-    print("PROCESS DONE")
 
     
 def tokenize(dataset, mode, size, model):
@@ -159,7 +148,6 @@ while not completed:
         from transformers.utils import logging
         import torch
         import multiprocessing as mp
-        # import scipy.sparse
         import copy
         import time
         import re
@@ -180,7 +168,6 @@ if __name__ == "__main__":
     print("Device:", dev)
 
     train, test = train_test_split(data_df, train_size=0.01)
-    # print(test)
 
     tfidf_vec = TfidfVectorizer()
     count_vec = CountVectorizer()
@@ -194,8 +181,7 @@ if __name__ == "__main__":
     i=0
     
     for key, value in tqdm(separate_periods(train).items(), desc="Generating Profiles"):
-        process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/train_docs_{i}.csv", bert_tokenizer, tfidf_vec, i))
-        # process.daemon = True
+        process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/train_docs/train_docs_{i}.csv", bert_tokenizer, tfidf_vec, i))
         processes.append(process)
         process.start()
         i+=1
@@ -204,10 +190,8 @@ if __name__ == "__main__":
     
     for index in range(len(processes)):
         processes[index].join()
-        df = pd.read_csv(f"FR_Test/train_docs_{index}.csv", sep=";")
+        df = pd.read_csv(f"FR_Test/train_docs/train_docs_{index}.csv", sep=";")
         train_docs = pd.concat([train_docs, df], ignore_index=True)
-    
-    # train_docs = pd.read_csv("FR_Test/train_docs.csv", sep=";")
         
     def match_lengths(col):
         series = train_docs.loc[:, col]
@@ -216,17 +200,13 @@ if __name__ == "__main__":
             if len(i) > max: max = len(i)
         
         for i in tqdm(range(len(series)), leave=False):
-            train_docs.at[i, col] = eval(train_docs.at[i, col])[:512] + [0]*(512-len(train_docs.at[i, col]))
-            # print(train_docs)
+            ls = eval(train_docs.at[i, col])
+            train_docs.at[i, col] = ls[:512] + [0]*(512-len(ls))
 
     match_lengths("doc")
     match_lengths("mask")
-
-    # outputs = pd.DataFrame(columns=["output", "period"])
-
-    print(train_docs)
+    
     train_docs = train_docs.sample(frac=1).reset_index(drop=True)
-    print(train_docs)
 
     svm = LinearSVC()
     
@@ -245,15 +225,13 @@ if __name__ == "__main__":
         print(docs)
         print(masks)
         
-        output = bert_model.forward(input=docs, attention_mask=masks).pooler_output.tolist()
+        output = bert_model.forward(input_ids=docs, attention_mask=masks).pooler_output.tolist()
         print(output)
         outputs.extend(output)
         print(outputs)
         for i in range(BATCH_SIZE):
             periods.append(train_docs.loc[first+i, "period"])
             print(train_docs.loc[first+i, "period"])
-        # outputs = np.append(outputs, output.tolist())
-        #TODO add output to a list, add corresponding period to another list, feed complete list into SVM
         
     svm.fit(outputs, periods)
     
@@ -275,8 +253,6 @@ if __name__ == "__main__":
         
         test_outputs.extend(output)
         
-        
-    # TODO feed each weighted document into model, "graph", run SVM
     estimates = svm.predict(test_outputs)
     acc, acc_3, acc_5 = []
     for i in tqdm(range(len(estimates))):
