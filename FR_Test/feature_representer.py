@@ -242,11 +242,8 @@ if __name__ == "__main__":
                 docs = torch.tensor(train_docs.loc[first:last, "doc"].tolist(), device=dev)
                 masks = torch.tensor(train_docs.loc[first:last, "mask"].tolist(), device=dev)
                 
-                # print(docs)
-                # print(masks)
-                
                 output = bert_model.forward(input_ids=docs, attention_mask=masks).pooler_output.tolist()
-                # print(output)
+                
                 print(len(output == BATCH_SIZE))
                 
                 for i in range(BATCH_SIZE):
