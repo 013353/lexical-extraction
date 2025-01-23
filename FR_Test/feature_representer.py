@@ -213,25 +213,26 @@ if __name__ == "__main__":
     outputs = []
     periods = []
 
-    BATCH_SIZE = 512
+    BATCH_SIZE = 64
     NUM_BATCHES_TRAIN  = int(np.ceil(len(train_docs.index)/BATCH_SIZE))
-    for i in range(NUM_BATCHES_TRAIN):
-        first = np.floor(BATCH_SIZE * i)
-        last = np.floor(BATCH_SIZE * (i+1))
-        
-        docs = torch.tensor(train_docs.loc[first:last, "doc"], device=dev)
-        masks = torch.tensor(train_docs.loc[first:last, "mask"], device=dev)
-        
-        print(docs)
-        print(masks)
-        
-        output = bert_model.forward(input_ids=docs, attention_mask=masks).pooler_output.tolist()
-        print(output)
-        outputs.extend(output)
-        print(outputs)
-        for i in range(BATCH_SIZE):
-            periods.append(train_docs.loc[first+i, "period"])
-            print(train_docs.loc[first+i, "period"])
+    for i in tqdm(range(NUM_BATCHES_TRAIN)):
+        with torch.no_grad():
+            first = np.floor(BATCH_SIZE * i)
+            last = np.floor(BATCH_SIZE * (i+1))
+            
+            docs = torch.tensor(train_docs.loc[first:last, "doc"].tolist(), device=dev)
+            masks = torch.tensor(train_docs.loc[first:last, "mask"].tolist(), device=dev)
+            
+            # print(docs)
+            # print(masks)
+            
+            output = bert_model.forward(input_ids=docs, attention_mask=masks).pooler_output.tolist()
+            # print(output)
+            outputs.extend(output)
+            # print(outputs)
+            for j in range(BATCH_SIZE):
+                periods.append(train_docs.loc[first+j, "period"])
+                # print(train_docs.loc[first+i, "period"])
         
     svm.fit(outputs, periods)
     
@@ -249,7 +250,7 @@ if __name__ == "__main__":
         
         docs = torch.tensor(tokenized_test[first:last], device=dev)
         
-        output = bert_model.forward(input=docs).pooler_output.tolist()
+        output = bert_model.forward(input_ids=docs).pooler_output.tolist()
         
         test_outputs.extend(output)
         
