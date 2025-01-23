@@ -2,4 +2,5 @@
 Documents/
 Documents (Copy)/
 Documents (Old)/
-train_docs_*.csv
+FR_Test/train_docs/
+FR_Test/profiles/

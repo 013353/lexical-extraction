@@ -10,21 +10,27 @@ def generate_profile(corpus, vectorizer, num):
         
     completed = False
     while not completed:
-            try:
-                arr = vectorizer.fit_transform(string_corpus)
-                completed = True
-            except MemoryError:
-                time.sleep(10)
+        try:
+            arr = vectorizer.fit_transform(string_corpus)
+            del string_corpus
+            completed = True
+        except MemoryError as e:
+            print(num, e)
+            time.sleep(10)
 
     token_df = pd.DataFrame.sparse.from_spmatrix(arr, columns=vectorizer.get_feature_names_out())
+
+    del arr
     
     weights = {}
     for index in token_df.index.to_list():
-        weights[index] = np.mean(token_df.loc[index])
+        weights[index] = token_df.loc[index].mean()
+    del token_df
     
     weights_df = pd.DataFrame.from_dict(weights, orient='index', columns=["weight"])
     
     sorted_weights_df = weights_df.sort_values(by=weights_df.columns[0], axis=0, ascending=False)
+    del weights_df
     
     weights_x = []
     
@@ -56,6 +62,8 @@ def generate_profile(corpus, vectorizer, num):
     middle_weights = middle_weights[middle_weights["weight"] > bottom]
     
     middle_ids = list(middle_weights.index)
+    
+    sorted_weights_df.to_csv(f"FR_Test/profiles/{num}.csv")
     
     return middle_ids
 
@@ -151,6 +159,7 @@ while not completed:
         import copy
         import time
         import re
+        import os
         from chunker import chunk_file
         completed = True
     except OSError as e:
@@ -167,7 +176,7 @@ if __name__ == "__main__":
     dev = "cuda:0" if torch.cuda.is_available() else "cpu"
     print("Device:", dev)
 
-    train, test = train_test_split(data_df, train_size=0.01)
+    train, test = train_test_split(data_df, train_size=0.1)
 
     tfidf_vec = TfidfVectorizer()
     count_vec = CountVectorizer()
@@ -178,8 +187,13 @@ if __name__ == "__main__":
 
     processes = []
 
+    files = os.listdir("FR_Test/train_docs")
+    for file in files:
+        file_path = os.path.join("FR_Test/train_docs", file)
+        if os.path.isfile(file_path):
+            os.remove(file_path)
+
     i=0
-    
     for key, value in tqdm(separate_periods(train).items(), desc="Generating Profiles"):
         process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/train_docs/train_docs_{i}.csv", bert_tokenizer, tfidf_vec, i))
         processes.append(process)
@@ -188,10 +202,12 @@ if __name__ == "__main__":
     
     train_docs = pd.DataFrame(columns=["doc", "mask", "period"])
     
-    for index in range(len(processes)):
+    for index in tqdm(range(len(processes)), desc="Joining Processes"):
         processes[index].join()
         df = pd.read_csv(f"FR_Test/train_docs/train_docs_{index}.csv", sep=";")
         train_docs = pd.concat([train_docs, df], ignore_index=True)
+    
+    del processes
         
     def match_lengths(col):
         series = train_docs.loc[:, col]
@@ -209,32 +225,36 @@ if __name__ == "__main__":
     train_docs = train_docs.sample(frac=1).reset_index(drop=True)
 
     svm = LinearSVC()
-    
-    outputs = []
-    periods = []
 
-    BATCH_SIZE = 64
-    NUM_BATCHES_TRAIN  = int(np.ceil(len(train_docs.index)/BATCH_SIZE))
-    for i in tqdm(range(NUM_BATCHES_TRAIN)):
-        with torch.no_grad():
-            first = np.floor(BATCH_SIZE * i)
-            last = np.floor(BATCH_SIZE * (i+1))
-            
-            docs = torch.tensor(train_docs.loc[first:last, "doc"].tolist(), device=dev)
-            masks = torch.tensor(train_docs.loc[first:last, "mask"].tolist(), device=dev)
-            
-            # print(docs)
-            # print(masks)
-            
-            output = bert_model.forward(input_ids=docs, attention_mask=masks).pooler_output.tolist()
-            # print(output)
-            outputs.extend(output)
-            # print(outputs)
-            for j in range(BATCH_SIZE):
-                periods.append(train_docs.loc[first+j, "period"])
-                # print(train_docs.loc[first+i, "period"])
-        
-    svm.fit(outputs, periods)
+    BATCH_SIZE = 128
+    
+    with open("FR_Test/train_outputs.csv", "w") as train_outputs:
+        train_outputs.write("output;period")
+    
+    with open("FR_Test/train_outputs.csv", "a") as train_outputs:
+
+        NUM_BATCHES_TRAIN  = int(np.ceil(len(train_docs.index)/BATCH_SIZE))
+        for batch in tqdm(range(NUM_BATCHES_TRAIN)):
+            with torch.no_grad():
+                first = np.floor(BATCH_SIZE * i)
+                last = np.floor(BATCH_SIZE * (i+1))
+                
+                docs = torch.tensor(train_docs.loc[first:last, "doc"].tolist(), device=dev)
+                masks = torch.tensor(train_docs.loc[first:last, "mask"].tolist(), device=dev)
+                
+                # print(docs)
+                # print(masks)
+                
+                output = bert_model.forward(input_ids=docs, attention_mask=masks).pooler_output.tolist()
+                # print(output)
+                print(len(output == BATCH_SIZE))
+                
+                for i in range(BATCH_SIZE):
+                    train_outputs.write(f"\n{output[i]};{train_docs.loc[first+i, "period"]}")
+    
+    train_outputs_df = pd.read_csv("FR_Test/train_outputs.csv", sep=";")
+    
+    svm.fit(train_outputs_df.loc[:, "output"], train_outputs_df.loc[:, "period"])
     
     tokenized_test = tokenize(test, "sentence", 1, bert_tokenizer)
     test_years = test.loc[:, "year"].tolist()
@@ -243,18 +263,27 @@ if __name__ == "__main__":
     
     test_outputs = []
     
-    NUM_BATCHES_TEST  = int(np.ceil(len(test.index)/BATCH_SIZE))
-    for i in tqdm(range(NUM_BATCHES_TEST)):
-        first = np.floor(BATCH_SIZE * i)
-        last = np.floor(BATCH_SIZE * (i+1))
+    with open("FR_Test/test_outputs.csv", "w") as test_outputs:
+        test_outputs.write("output;period")
+    
+    with open("FR_Test/test_outputs.csv", "a") as test_outputs:
+    
+        NUM_BATCHES_TEST  = int(np.ceil(len(test.index)/BATCH_SIZE))
+        for i in tqdm(range(NUM_BATCHES_TEST)):
+            with torch.no_grad():
+                first = np.floor(BATCH_SIZE * i)
+                last = np.floor(BATCH_SIZE * (i+1))
+                
+                docs = torch.tensor(tokenized_test[first:last], device=dev)
+                
+                output = bert_model.forward(input_ids=docs).pooler_output.tolist()
+                
+                for i in range(BATCH_SIZE):
+                    test_outputs.write(f"\n{output[i]};{test_years[first+i]}")
+    
+    test_outputs_df = pd.read_csv("FR_Test/test_outputs.csv", sep=";")
         
-        docs = torch.tensor(tokenized_test[first:last], device=dev)
-        
-        output = bert_model.forward(input_ids=docs).pooler_output.tolist()
-        
-        test_outputs.extend(output)
-        
-    estimates = svm.predict(test_outputs)
+    estimates = svm.predict(test_outputs_df.loc[:, "output"])
     acc, acc_3, acc_5 = []
     for i in tqdm(range(len(estimates))):
         estimate = estimates.item(i)
