@@ -1,6 +1,20 @@
 PERIOD_LENGTH = 10
 
 def generate_profile(corpus, vectorizer, num):
+    """
+    Generates a profile of the given `corpus` with the middle 75% of ids
+    
+    Parameters:
+    -----------
+    `corpus`: The corpus from which to generate a profile
+    `vectorizer`: The vectorizer to weight ids with, this program uses `TfidfVectorizer` and `CountVectorizer` from `sklearn.feature_extraction.text`
+    `num`: The process number, used with multiprocessing to keep track of individual processes
+    
+    Returns:
+    --------
+    `list`: Middle 75% of ids, sorted from highest to lowest weight
+    
+    """
     string_corpus = []
     for doc in corpus:
         doc_string = ""
@@ -68,6 +82,19 @@ def generate_profile(corpus, vectorizer, num):
     return middle_ids
 
 def add_inputs_to_file(period, docs, filepath, tokenizer, vectorizer, num):
+    """
+    Adds `docs` to `file` with masks and `period` data
+    
+    Parameters:
+    -----------
+    `period`: The time period of `docs`
+    `docs`: `pandas.Series` of the documents in the `period`
+    `filepath`: The location of the file to write to
+    `tokenizer`: The algorithm to use to tokenize `docs`
+    `vectorizer`: The vectorizer to weight ids with, this program uses `TfidfVectorizer` and `CountVectorizer` from `sklearn.feature_extraction.text`
+    `num`: The process number, used with multiprocessing to keep track of individual processes
+    
+    """
     tokenized_period = tokenize(docs, "sentence", 1, tokenizer)
 
     with open(filepath, "w") as train_docs_file:
@@ -83,6 +110,21 @@ def add_inputs_to_file(period, docs, filepath, tokenizer, vectorizer, num):
 
     
 def tokenize(dataset, mode, size, model):
+    """
+    Tokenizes documents from `dataset`
+    
+    Parameters:
+    -----------
+    `dataset`: `pandas.Series` of the documents to tokenize
+    `mode` (`"sentence"`, `"paragraph"`, `"word"`): The mode to chunk each document with
+    `size`: The size of each chunk
+    `model`: The algorithm to use to tokenize each document
+    
+    Returns:
+    --------
+    `list`: The chunked documents as a 2D list
+    
+    """
     chunked_docs = []
     
     for i, row in dataset.iterrows():
