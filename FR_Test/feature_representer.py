@@ -176,7 +176,7 @@ if __name__ == "__main__":
     dev = "cuda:0" if torch.cuda.is_available() else "cpu"
     print("Device:", dev)
 
-    train, test = train_test_split(data_df, train_size=0.1)
+    train, test = train_test_split(data_df, train_size=0.5)
 
     tfidf_vec = TfidfVectorizer()
     count_vec = CountVectorizer()
@@ -194,7 +194,7 @@ if __name__ == "__main__":
             os.remove(file_path)
 
     i=0
-    for key, value in tqdm(separate_periods(train).items(), desc="Generating Profiles"):
+    for key, value in tqdm(separate_periods(train).items(), desc="Starting Profile Generators"):
         process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/train_docs/train_docs_{i}.csv", bert_tokenizer, tfidf_vec, i))
         processes.append(process)
         process.start()
@@ -202,7 +202,7 @@ if __name__ == "__main__":
     
     train_docs = pd.DataFrame(columns=["doc", "mask", "period"])
     
-    for index in tqdm(range(len(processes)), desc="Joining Processes"):
+    for index in tqdm(range(len(processes)), desc="Joining Profile Generators"):
         processes[index].join()
         df = pd.read_csv(f"FR_Test/train_docs/train_docs_{index}.csv", sep=";")
         train_docs = pd.concat([train_docs, df], ignore_index=True)
