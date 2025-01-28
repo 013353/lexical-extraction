@@ -15,13 +15,16 @@ def generate_profile(corpus, vectorizer, num):
     `list`: Middle 75% of ids, sorted from highest to lowest weight
     
     """
+    
+    # convert each doc from a list of ints to a list of strings
     string_corpus = []
     for doc in corpus:
         doc_string = ""
         for token in doc:
             doc_string += str(token) if len(doc_string) == 0 else " " + str(token)
         string_corpus.append(doc_string)
-        
+    
+    # vectorize each doc when memory is available
     completed = False
     while not completed:
         try:
@@ -32,54 +35,68 @@ def generate_profile(corpus, vectorizer, num):
             print(num, e)
             time.sleep(10)
 
+    # create a dataframe of the tf-idf score of each token in each document
     token_df = pd.DataFrame.sparse.from_spmatrix(arr, columns=vectorizer.get_feature_names_out())
 
     del arr
     
+    # create a dict of the mean tf-idf score of each token
     weights = {}
     for index in token_df.index.to_list():
-        weights[index] = token_df.loc[index].mean()
+        completed = False
+        while not completed:
+            try:
+                weights[index] = np.mean(token_df.loc[index])
+                completed = True
+            except MemoryError:
+                time.sleep(30)
+                
     del token_df
     
+    # convert mean weight dict to dataframe and sort by weight
     weights_df = pd.DataFrame.from_dict(weights, orient='index', columns=["weight"])
-    
     sorted_weights_df = weights_df.sort_values(by=weights_df.columns[0], axis=0, ascending=False)
     del weights_df
     
+    # find the mean and standard deviation of the set of integers with the same length as sorted_weights_df
+    #TODO make this more succinct
     weights_x = []
-    
     for i, row in sorted_weights_df.iterrows():
         weights_x.append(row["weight"])
-    
     weights_mean = np.mean(range(len(weights_x)))
     weights_std = np.std(range(len(weights_x)))
     
     def bell_curve(x, std, mean, mult=1):
         return mult/(std * np.sqrt(2 * np.pi)) * np.e**( - (x - mean)**2 / (2 * std**2))
     
+    # weight each weight according to a bell curve raised to the 4th power
     i = 0
     for index, row in sorted_weights_df.iterrows():
         i += 1
         sorted_weights_df.at[index, "weight"] = bell_curve(i, weights_std, weights_mean)**4 * row["weight"]
-        
-    mult = 1/min(list(sorted_weights_df["weight"]))
     
+    # make the minimum weight 1
+    mult = 1/min(list(sorted_weights_df["weight"]))
     for index, row in sorted_weights_df.iterrows():
         sorted_weights_df.at[index, "weight"] *= mult
     
+    # re-sort the weights
     sorted_weights_df = sorted_weights_df.sort_values(by=sorted_weights_df.columns[0], axis=0, ascending=False)
-        
+    
+    # identify the upper and lower quantile boundaries
     bottom = sorted_weights_df.quantile(0.125)["weight"]
     top = sorted_weights_df.quantile(0.875)["weight"]
     
+    # remove weights outside the selected quantile range
     middle_weights = sorted_weights_df[sorted_weights_df["weight"] < top]
     middle_weights = middle_weights[middle_weights["weight"] > bottom]
     
+    # identify the ids in the selected range, save to file, return
     middle_ids = list(middle_weights.index)
-    
     sorted_weights_df.to_csv(f"FR_Test/profiles/{num}.csv")
     
     return middle_ids
+
 
 def add_inputs_to_file(period, docs, filepath, tokenizer, vectorizer, num):
     """
@@ -95,11 +112,16 @@ def add_inputs_to_file(period, docs, filepath, tokenizer, vectorizer, num):
     `num`: The process number, used with multiprocessing to keep track of individual processes
     
     """
+    
+    # tokenize each document in the given period
+    # returns a list of each document as a list
     tokenized_period = tokenize(docs, "sentence", 1, tokenizer)
 
+    # clear file
     with open(filepath, "w") as train_docs_file:
         train_docs_file.write("doc;mask;period")
 
+    # generate profile and append it to file
     profile = generate_profile(tokenized_period, vectorizer, num)
     with open(filepath, "a") as file:
         for doc in tokenized_period:
@@ -125,28 +147,32 @@ def tokenize(dataset, mode, size, model):
     `list`: The chunked documents as a 2D list
     
     """
-    chunked_docs = []
     
+    # create a list of docs separated into chunks
+    chunked_docs = []
     for i, row in dataset.iterrows():
         chunked_docs.append(chunk_file(row["filepath"], mode, size))
     
+    # create a list of each chunk, tokenized
     tokenized_chunks = []
-    
     for doc in chunked_docs:
         for chunk in doc:
             
+            # split each chunk into words
             words = chunk.split()
             
+            # filter out inaccurately digitized words into a list
             masked_chunk = []
-            
             for word in words:
                 if re.match(r"\w+", word):
                     masked_chunk.append(word)
                 else:
                     masked_chunk.append("[UNK]")
             
+            # reform the list of words into a string
             chunk = " ".join(masked_chunk)
             
+            # tokenize the chunk and append to tokenized_chunks
             tokenized_chunk = model.encode(chunk)
             tokenized_chunks.append(tokenized_chunk)
 
@@ -154,13 +180,40 @@ def tokenize(dataset, mode, size, model):
 
 
 def separate_periods(df):
+    """
+    Separates docs in `df` by period
+    
+    Parameters:
+    -----------
+    `df`: The dataframe to separate
+        `columns` = [`"filepath"`, `"title"`, `"year"`]
+    
+    Returns:
+    --------
+    `dict`: The documents separated by period
+        `key`: Period
+        `value`: `pandas.DataFrame` of docs in the period
+            `columns` = [`"filepath"`, `"title"`, `"year"`]
+
+    """
+    
     periods = {}
+    
+    # sort docs by year, print result
     docs_df = df.sort_values(by="year")
     print(docs_df)
+    
+    # separate docs_df into periods and add docs as a dataframe to periods
     for index, row in tqdm(docs_df.iterrows(), total=len(docs_df.index), desc="Separating Documents"):
+        
+        # find the period of the doc rounded down
         period = int(PERIOD_LENGTH * np.floor(row["year"]/PERIOD_LENGTH))
+        
+        # create a new dataframe in periods if one doesn't already exist
         if not period in periods:
             periods[period] = pd.DataFrame(columns=["filepath", "title", "year"])
+            
+        # add the current doc data to the period dataframe in periods
         r = pd.DataFrame(row).transpose()
         periods[period].loc[len(periods[period])] = r.iloc[0]
 
@@ -169,8 +222,20 @@ def separate_periods(df):
 
 def get_accuracy(estimate, expected):
     """
-    RETURNS TUPLE:
-    (`acc`, `acc@3`, `acc@5`)
+    Returns a tuple of bools of if the `estimate` is within each measure of `expected`
+    
+    `Acc@K` is a measure of accuracy that considers all documents within K/2 periods of expected to be accurate (Ren et al., 2023)
+    
+    Parameters:
+    -----------
+    `estimate`: The estimated period
+    `expected`: The actual period
+    
+    Returns:
+    --------
+    `tuple`: (`acc`, `acc@3`, `acc@5`)
+        (`bool`, `bool`, `bool`)
+    
     """
     #TODO F1 score
     acc, acc_3, acc_5 = False
@@ -206,35 +271,40 @@ while not completed:
         completed = True
     except OSError as e:
         print(e)
-        time.sleep(10)
 
+# set transformers to only print errors to the console
 logging.set_verbosity_error()
 
 if __name__ == "__main__":
     print("\rDONE!")
 
+    # retrieve doc data from file
     data_df = pd.read_csv("Documents/_doc_data.csv")
 
+    # activate PyTorch cuda support if available
     dev = "cuda:0" if torch.cuda.is_available() else "cpu"
     print("Device:", dev)
 
-    train, test = train_test_split(data_df, train_size=0.5)
+    # split docs into train and test data
+    train, test = train_test_split(data_df, train_size=0.25)
 
+    # initialize tf-idf and standard vectorizers
     tfidf_vec = TfidfVectorizer()
     count_vec = CountVectorizer()
 
-
+    # initialize BERT tokenizer and model
     bert_tokenizer = BertTokenizerFast.from_pretrained("google-bert/bert-base-uncased")
     bert_model = BertModel.from_pretrained("google-bert/bert-base-uncased").to(dev)
 
-    processes = []
-
+    # delete all train_docs files
     files = os.listdir("FR_Test/train_docs")
     for file in files:
         file_path = os.path.join("FR_Test/train_docs", file)
         if os.path.isfile(file_path):
             os.remove(file_path)
-
+    
+    # start threads to generate each profile, store threads in processes
+    processes = []
     i=0
     for key, value in tqdm(separate_periods(train).items(), desc="Starting Profile Generators"):
         process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/train_docs/train_docs_{i}.csv", bert_tokenizer, tfidf_vec, i))
@@ -242,8 +312,8 @@ if __name__ == "__main__":
         process.start()
         i+=1
     
+    # join profile generator threads and add docs to train_docs dataframe
     train_docs = pd.DataFrame(columns=["doc", "mask", "period"])
-    
     for index in tqdm(range(len(processes)), desc="Joining Profile Generators"):
         processes[index].join()
         df = pd.read_csv(f"FR_Test/train_docs/train_docs_{index}.csv", sep=";")
@@ -252,49 +322,72 @@ if __name__ == "__main__":
     del processes
         
     def match_lengths(col):
-        series = train_docs.loc[:, col]
-        max = 0
-        for i in series:
-            if len(i) > max: max = len(i)
+        """
+        Sets the length of `col` of `train_docs` to a set length
         
+        Parameters:
+        -----------
+        `col`: The column to edit
+        
+        """
+        
+        # get the specified column of train_docs as a series
+        series = train_docs.loc[:, col]
+        
+        # set the length of each list in the column to 512, truncate or pad with 0s if necessary
         for i in tqdm(range(len(series)), leave=False):
             ls = eval(train_docs.at[i, col])
             train_docs.at[i, col] = ls[:512] + [0]*(512-len(ls))
 
+    # set all docs and masks to the same length
     match_lengths("doc")
     match_lengths("mask")
     
+    # shuffle train_docs
     train_docs = train_docs.sample(frac=1).reset_index(drop=True)
 
+    # initialize SVM
     svm = LinearSVC()
 
     BATCH_SIZE = 128
     
+    # clear train_outputs.csv
     with open("FR_Test/train_outputs.csv", "w") as train_outputs:
         train_outputs.write("output;period")
     
     with open("FR_Test/train_outputs.csv", "a") as train_outputs:
 
+        # pass all docs through the model, batch size specified above
         NUM_BATCHES_TRAIN  = int(np.ceil(len(train_docs.index)/BATCH_SIZE))
         for batch in tqdm(range(NUM_BATCHES_TRAIN)):
+            
+            # torch.no_grad() clears VRAM to prevent OOM error
             with torch.no_grad():
+                
+                # find first and last indices of batch in train_docs
                 first = np.floor(BATCH_SIZE * i)
                 last = np.floor(BATCH_SIZE * (i+1))
                 
+                # convert train docs and masks to GPU tensors
                 docs = torch.tensor(train_docs.loc[first:last, "doc"].tolist(), device=dev)
                 masks = torch.tensor(train_docs.loc[first:last, "mask"].tolist(), device=dev)
                 
+                # pass tensors into model, get pooler_output
                 output = bert_model.forward(input_ids=docs, attention_mask=masks).pooler_output.tolist()
                 
                 print(len(output == BATCH_SIZE))
                 
+                # add outputs to file
                 for i in range(BATCH_SIZE):
                     train_outputs.write(f"\n{output[i]};{train_docs.loc[first+i, "period"]}")
     
+    # create a dataframe from the outputs of the model
     train_outputs_df = pd.read_csv("FR_Test/train_outputs.csv", sep=";")
     
+    # train the SVM om the outputs
     svm.fit(train_outputs_df.loc[:, "output"], train_outputs_df.loc[:, "period"])
     
+    # tokenize test data and store years in test_years
     tokenized_test = tokenize(test, "sentence", 1, bert_tokenizer)
     test_years = test.loc[:, "year"].tolist()
     print(tokenized_test)
@@ -302,27 +395,40 @@ if __name__ == "__main__":
     
     test_outputs = []
     
+    # clear test_outputs.csv
     with open("FR_Test/test_outputs.csv", "w") as test_outputs:
         test_outputs.write("output;period")
     
     with open("FR_Test/test_outputs.csv", "a") as test_outputs:
-    
+        
+        # pass all test documents through model
         NUM_BATCHES_TEST  = int(np.ceil(len(test.index)/BATCH_SIZE))
         for i in tqdm(range(NUM_BATCHES_TEST)):
+            
+            # torch.no_grad() clears VRAM to prevent OOM error
             with torch.no_grad():
+                
+                # find first and last indices of batch in test data
                 first = np.floor(BATCH_SIZE * i)
                 last = np.floor(BATCH_SIZE * (i+1))
                 
+                # convert test docs to GPU tensor
                 docs = torch.tensor(tokenized_test[first:last], device=dev)
                 
+                # pass test docs through model, get pooler_output
                 output = bert_model.forward(input_ids=docs).pooler_output.tolist()
                 
+                # add outputs to file
                 for i in range(BATCH_SIZE):
                     test_outputs.write(f"\n{output[i]};{test_years[first+i]}")
     
+    # create a dataframe from the outputs of the model
     test_outputs_df = pd.read_csv("FR_Test/test_outputs.csv", sep=";")
-        
+    
+    # get estimates of the year of each test document from the SVM
     estimates = svm.predict(test_outputs_df.loc[:, "output"])
+    
+    # assess the accuracy of the model using Acc, Acc@3, and Acc@5
     acc, acc_3, acc_5 = []
     for i in tqdm(range(len(estimates))):
         estimate = estimates.item(i)
@@ -332,6 +438,7 @@ if __name__ == "__main__":
         acc_3.append(accs[1])
         acc_5.append(accs[2])
     
+    # print the mean accuracy of the model for each metric
     print("Acc:", np.mean(acc))
     print("Acc@3:", np.mean(acc_3))
     print("Acc@5:", np.mean(acc_5))
