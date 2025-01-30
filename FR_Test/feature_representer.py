@@ -91,6 +91,13 @@ def generate_profile(corpus, vectorizer, num):
     middle_weights = sorted_weights_df[sorted_weights_df["weight"] < top]
     middle_weights = middle_weights[middle_weights["weight"] > bottom]
     
+    # delete all profile files
+    files = os.listdir("FR_Test/profiles")
+    for file in files:
+        file_path = os.path.join("FR_Test/profiles", file)
+        if os.path.isfile(file_path):
+            os.remove(file_path)
+    
     # identify the ids in the selected range, save to file, return
     middle_ids = list(middle_weights.index)
     sorted_weights_df.to_csv(f"FR_Test/profiles/{num}.csv")
