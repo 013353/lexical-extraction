@@ -98,7 +98,7 @@ def generate_profile(corpus, vectorizer, num):
     return middle_ids
 
 
-def add_inputs_to_file(period, docs, filepath, tokenizer, vectorizer, num):
+def add_inputs_to_file(period, docs, filepath, tokenizer, tokenizer_params, vectorizer, num):
     """
     Adds `docs` to `file` with masks and `period` data
     
@@ -108,6 +108,8 @@ def add_inputs_to_file(period, docs, filepath, tokenizer, vectorizer, num):
     `docs`: `pandas.Series` of the documents in the `period`
     `filepath`: The location of the file to write to
     `tokenizer`: The algorithm to use to tokenize `docs`
+    `chunker_params` (`mode`, `size`): The set of parameters to pass to the chunker before tokenizing
+        (`str`, `int`)
     `vectorizer`: The vectorizer to weight ids with, this program uses `TfidfVectorizer` and `CountVectorizer` from `sklearn.feature_extraction.text`
     `num`: The process number, used with multiprocessing to keep track of individual processes
     
@@ -259,11 +261,10 @@ while not completed:
         from sklearn.model_selection import train_test_split
         from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
         from sklearn.svm import LinearSVC
-        from transformers import BertTokenizerFast, BertModel
+        from transformers import BertTokenizerFast, BertModel, RobertaTokenizerFast, RobertaModel, LongformerTokenizerFast, LongformerModel
         from transformers.utils import logging
         import torch
         import multiprocessing as mp
-        import copy
         import time
         import re
         import os
@@ -289,156 +290,180 @@ if __name__ == "__main__":
     train, test = train_test_split(data_df, train_size=0.25)
 
     # initialize tf-idf and standard vectorizers
-    tfidf_vec = TfidfVectorizer()
-    count_vec = CountVectorizer()
+    vectorizers = [TfidfVectorizer(), CountVectorizer()]
 
-    # initialize BERT tokenizer and model
-    bert_tokenizer = BertTokenizerFast.from_pretrained("google-bert/bert-base-uncased")
-    bert_model = BertModel.from_pretrained("google-bert/bert-base-uncased").to(dev)
+    # list chunker parameter combinations
+    chunker_params = [("sentence", 5), ("sentence", 10), ("paragraph", 1), ("paragraph", 2), ("word", 100), ("word", 200), ("word", 300)]
 
-    # delete all train_docs files
-    files = os.listdir("FR_Test/train_docs")
-    for file in files:
-        file_path = os.path.join("FR_Test/train_docs", file)
-        if os.path.isfile(file_path):
-            os.remove(file_path)
-    
-    # start threads to generate each profile, store threads in processes
-    processes = []
-    i=0
-    for key, value in tqdm(separate_periods(train).items(), desc="Starting Profile Generators"):
-        process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/train_docs/train_docs_{i}.csv", bert_tokenizer, tfidf_vec, i))
-        processes.append(process)
-        process.start()
-        i+=1
-    
-    # join profile generator threads and add docs to train_docs dataframe
-    train_docs = pd.DataFrame(columns=["doc", "mask", "period"])
-    for index in tqdm(range(len(processes)), desc="Joining Profile Generators"):
-        processes[index].join()
-        df = pd.read_csv(f"FR_Test/train_docs/train_docs_{index}.csv", sep=";")
-        train_docs = pd.concat([train_docs, df], ignore_index=True)
-    
-    del processes
+    transformers = ["BERT", "RoBERTa", "Longformer"]    
+    for transformer in transformers:
         
-    def match_lengths(col):
-        """
-        Sets the length of `col` of `train_docs` to a set length
-        
-        Parameters:
-        -----------
-        `col`: The column to edit
-        
-        """
-        
-        # get the specified column of train_docs as a series
-        series = train_docs.loc[:, col]
-        
-        # set the length of each list in the column to 512, truncate or pad with 0s if necessary
-        for i in tqdm(range(len(series)), leave=False):
-            ls = eval(train_docs.at[i, col])
-            train_docs.at[i, col] = ls[:512] + [0]*(512-len(ls))
-
-    # set all docs and masks to the same length
-    match_lengths("doc")
-    match_lengths("mask")
-    
-    # shuffle train_docs
-    train_docs = train_docs.sample(frac=1).reset_index(drop=True)
-
-    # initialize SVM
-    svm = LinearSVC()
-
-    BATCH_SIZE = 128
-    
-    # clear train_outputs.csv
-    with open("FR_Test/train_outputs.csv", "w") as train_outputs:
-        train_outputs.write("output;period")
-    
-    with open("FR_Test/train_outputs.csv", "a") as train_outputs:
-
-        # pass all docs through the model, batch size specified above
-        NUM_BATCHES_TRAIN  = int(np.ceil(len(train_docs.index)/BATCH_SIZE))
-        for batch in tqdm(range(NUM_BATCHES_TRAIN)):
+        # disables gradient calculation, saving GPU memory
+        with torch.no_grad():
             
-            # torch.no_grad() clears VRAM to prevent OOM error
-            with torch.no_grad():
-                
-                # find first and last indices of batch in train_docs
-                first = np.floor(BATCH_SIZE * i)
-                last = np.floor(BATCH_SIZE * (i+1))
-                
-                # convert train docs and masks to GPU tensors
-                docs = torch.tensor(train_docs.loc[first:last, "doc"].tolist(), device=dev)
-                masks = torch.tensor(train_docs.loc[first:last, "mask"].tolist(), device=dev)
-                
-                # pass tensors into model, get pooler_output
-                output = bert_model.forward(input_ids=docs, attention_mask=masks).pooler_output.tolist()
-                
-                print(len(output == BATCH_SIZE))
-                
-                # add outputs to file
-                for i in range(BATCH_SIZE):
-                    train_outputs.write(f"\n{output[i]};{train_docs.loc[first+i, "period"]}")
-    
-    # create a dataframe from the outputs of the model
-    train_outputs_df = pd.read_csv("FR_Test/train_outputs.csv", sep=";")
-    
-    # train the SVM om the outputs
-    svm.fit(train_outputs_df.loc[:, "output"], train_outputs_df.loc[:, "period"])
-    
-    # tokenize test data and store years in test_years
-    tokenized_test = tokenize(test, "sentence", 1, bert_tokenizer)
-    test_years = test.loc[:, "year"].tolist()
-    print(tokenized_test)
-    print(test_years)
-    
-    test_outputs = []
-    
-    # clear test_outputs.csv
-    with open("FR_Test/test_outputs.csv", "w") as test_outputs:
-        test_outputs.write("output;period")
-    
-    with open("FR_Test/test_outputs.csv", "a") as test_outputs:
-        
-        # pass all test documents through model
-        NUM_BATCHES_TEST  = int(np.ceil(len(test.index)/BATCH_SIZE))
-        for i in tqdm(range(NUM_BATCHES_TEST)):
+            # initialize tokenizers and models
+            match transformer:
+                case "BERT":
+                    tokenizer = BertTokenizerFast.from_pretrained("google-bert/bert-base-uncased")
+                    model = BertModel.from_pretrained("google-bert/bert-base-uncased").to(dev)
+                    max_input_length = 512
+                case "RoBERTa":
+                    tokenizer = RobertaTokenizerFast.from_pretrained("FacebookAI/roberta-base")
+                    model = RobertaModel.from_pretrained("FacebookAI/roberta-base").to(dev)
+                    max_input_length = 512
+                case "Longformer":
+                    tokenizer = LongformerTokenizerFast.from_pretrained("allenai/longformer-base-4096")
+                    model = LongformerModel.from_pretrained("allenai/longformer-base-4096").to(dev)
+                    max_input_length = 1024
             
-            # torch.no_grad() clears VRAM to prevent OOM error
-            with torch.no_grad():
-                
-                # find first and last indices of batch in test data
-                first = np.floor(BATCH_SIZE * i)
-                last = np.floor(BATCH_SIZE * (i+1))
-                
-                # convert test docs to GPU tensor
-                docs = torch.tensor(tokenized_test[first:last], device=dev)
-                
-                # pass test docs through model, get pooler_output
-                output = bert_model.forward(input_ids=docs).pooler_output.tolist()
-                
-                # add outputs to file
-                for i in range(BATCH_SIZE):
-                    test_outputs.write(f"\n{output[i]};{test_years[first+i]}")
-    
-    # create a dataframe from the outputs of the model
-    test_outputs_df = pd.read_csv("FR_Test/test_outputs.csv", sep=";")
-    
-    # get estimates of the year of each test document from the SVM
-    estimates = svm.predict(test_outputs_df.loc[:, "output"])
-    
-    # assess the accuracy of the model using Acc, Acc@3, and Acc@5
-    acc, acc_3, acc_5 = []
-    for i in tqdm(range(len(estimates))):
-        estimate = estimates.item(i)
-        expected = test_years[i]
-        accs = get_accuracy(estimate, expected)
-        acc.append(accs[0])
-        acc_3.append(accs[1])
-        acc_5.append(accs[2])
-    
-    # print the mean accuracy of the model for each metric
-    print("Acc:", np.mean(acc))
-    print("Acc@3:", np.mean(acc_3))
-    print("Acc@5:", np.mean(acc_5))
+            for chunker_params in chunker_params:
+            
+                for vectorizer in vectorizers:
+
+                    # delete all train_docs files
+                    files = os.listdir("FR_Test/train_docs")
+                    for file in files:
+                        file_path = os.path.join("FR_Test/train_docs", file)
+                        if os.path.isfile(file_path):
+                            os.remove(file_path)
+                    
+                    # start threads to generate each profile, store threads in processes
+                    processes = []
+                    i=0
+                    for key, value in tqdm(separate_periods(train).items(), desc="Starting Profile Generators"):
+                        process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/train_docs/train_docs_{i}.csv", tokenizer, chunker_params, vectorizer, i))
+                        processes.append(process)
+                        process.start()
+                        i+=1
+                    
+                    # join profile generator threads and add docs to train_docs dataframe
+                    train_docs = pd.DataFrame(columns=["doc", "mask", "period"])
+                    for index in tqdm(range(len(processes)), desc="Joining Profile Generators"):
+                        processes[index].join()
+                        df = pd.read_csv(f"FR_Test/train_docs/train_docs_{index}.csv", sep=";")
+                        train_docs = pd.concat([train_docs, df], ignore_index=True)
+                    
+                    del processes
+                        
+                    def match_lengths(col, length):
+                        """
+                        Sets the length of `col` of `train_docs` to a set length
+                        
+                        Parameters:
+                        -----------
+                        `col`: The column to edit
+                        `length`: The length to adjust to
+                        
+                        """
+                        
+                        # get the specified column of train_docs as a series
+                        series = train_docs.loc[:, col]
+                        
+                        # set the length of each list in the column to len, truncate or pad with 0s if necessary
+                        for i in tqdm(range(len(series)), leave=False):
+                            ls = eval(train_docs.at[i, col])
+                            train_docs.at[i, col] = ls[:length] + [0]*(length-len(ls))
+
+                    # set all docs and masks to the same length
+                    match_lengths("doc", max_input_length)
+                    match_lengths("mask", max_input_length)
+                    
+                    # shuffle train_docs
+                    train_docs = train_docs.sample(frac=1).reset_index(drop=True)
+
+                    # initialize SVM
+                    svm = LinearSVC()
+
+                    BATCH_SIZE = 128
+                    
+                    # clear train_outputs.csv
+                    with open("FR_Test/train_outputs.csv", "w") as train_outputs:
+                        train_outputs.write("output;period")
+                    
+                    with open("FR_Test/train_outputs.csv", "a") as train_outputs:
+
+                        # pass all docs through the model, batch size specified above
+                        NUM_BATCHES_TRAIN  = int(np.ceil(len(train_docs.index)/BATCH_SIZE))
+                        for batch in tqdm(range(NUM_BATCHES_TRAIN)):
+                            
+                            # torch.no_grad() disables gradient calculation to prevent OOM error
+                            with torch.no_grad():
+                                
+                                # find first and last indices of batch in train_docs
+                                first = np.floor(BATCH_SIZE * i)
+                                last = np.floor(BATCH_SIZE * (i+1))
+                                
+                                # convert train docs and masks to GPU tensors
+                                docs = torch.tensor(train_docs.loc[first:last, "doc"].tolist(), device=dev)
+                                masks = torch.tensor(train_docs.loc[first:last, "mask"].tolist(), device=dev)
+                                
+                                # pass tensors into model, get pooler_output
+                                output = model.forward(input_ids=docs, attention_mask=masks).pooler_output.tolist()
+                                
+                                print(len(output == BATCH_SIZE))
+                                
+                                # add outputs to file
+                                for i in range(BATCH_SIZE):
+                                    train_outputs.write(f"\n{output[i]};{train_docs.loc[first+i, "period"]}")
+                    
+                    # create a dataframe from the outputs of the model
+                    train_outputs_df = pd.read_csv("FR_Test/train_outputs.csv", sep=";")
+                    
+                    # train the SVM om the outputs
+                    svm.fit(train_outputs_df.loc[:, "output"], train_outputs_df.loc[:, "period"])
+                    
+                    # tokenize test data and store years in test_years
+                    tokenized_test = tokenize(test, "sentence", 1, tokenizer)
+                    test_years = test.loc[:, "year"].tolist()
+                    print(tokenized_test)
+                    print(test_years)
+                    
+                    test_outputs = []
+                    
+                    # clear test_outputs.csv
+                    with open("FR_Test/test_outputs.csv", "w") as test_outputs:
+                        test_outputs.write("output;period")
+                    
+                    with open("FR_Test/test_outputs.csv", "a") as test_outputs:
+                        
+                        # pass all test documents through model
+                        NUM_BATCHES_TEST  = int(np.ceil(len(test.index)/BATCH_SIZE))
+                        for i in tqdm(range(NUM_BATCHES_TEST)):
+                            
+                            # torch.no_grad() disables gradient calculation to prevent OOM error
+                            with torch.no_grad():
+                                
+                                # find first and last indices of batch in test data
+                                first = np.floor(BATCH_SIZE * i)
+                                last = np.floor(BATCH_SIZE * (i+1))
+                                
+                                # convert test docs to GPU tensor
+                                docs = torch.tensor(tokenized_test[first:last], device=dev)
+                                
+                                # pass test docs through model, get pooler_output
+                                output = model.forward(input_ids=docs).pooler_output.tolist()
+                                
+                                # add outputs to file
+                                for i in range(BATCH_SIZE):
+                                    test_outputs.write(f"\n{output[i]};{test_years[first+i]}")
+                    
+                    # create a dataframe from the outputs of the model
+                    test_outputs_df = pd.read_csv("FR_Test/test_outputs.csv", sep=";")
+                    
+                    # get estimates of the year of each test document from the SVM
+                    estimates = svm.predict(test_outputs_df.loc[:, "output"])
+                    
+                    # assess the accuracy of the model using Acc, Acc@3, and Acc@5
+                    acc, acc_3, acc_5 = []
+                    for i in tqdm(range(len(estimates))):
+                        estimate = estimates.item(i)
+                        expected = test_years[i]
+                        accs = get_accuracy(estimate, expected)
+                        acc.append(accs[0])
+                        acc_3.append(accs[1])
+                        acc_5.append(accs[2])
+                    
+                    # print the mean accuracy of the model for each metric
+                    print("Acc:", np.mean(acc))
+                    print("Acc@3:", np.mean(acc_3))
+                    print("Acc@5:", np.mean(acc_5))
