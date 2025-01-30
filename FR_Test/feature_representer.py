@@ -1,5 +1,33 @@
 PERIOD_LENGTH = 10
 
+def head_file(filepath, header):
+    """
+    Clears the given file and adds a header to it, used for CSV file reset
+    
+    Parameters:
+    -----------
+    `filepath`: The file to head
+    `header`: The header to add to the file
+    """
+    
+    with open(filepath, "w") as file:
+        file.write(header)
+        
+def clear_dir(directory):
+    """
+    Removes all files from the given directory
+    
+    Parameters:
+    -----------
+    `directory`: The directory to clear
+    """
+    
+    files = os.listdir(directory)
+    for file in files:
+        file_path = os.path.join(directory, file)
+        if os.path.isfile(file_path):
+            os.remove(file_path)
+
 def generate_profile(corpus, vectorizer, num):
     """
     Generates a profile of the given `corpus` with the middle 75% of ids
@@ -91,13 +119,6 @@ def generate_profile(corpus, vectorizer, num):
     middle_weights = sorted_weights_df[sorted_weights_df["weight"] < top]
     middle_weights = middle_weights[middle_weights["weight"] > bottom]
     
-    # delete all profile files
-    files = os.listdir("FR_Test/profiles")
-    for file in files:
-        file_path = os.path.join("FR_Test/profiles", file)
-        if os.path.isfile(file_path):
-            os.remove(file_path)
-    
     # identify the ids in the selected range, save to file, return
     middle_ids = list(middle_weights.index)
     sorted_weights_df.to_csv(f"FR_Test/profiles/{num}.csv")
@@ -127,8 +148,7 @@ def add_inputs_to_file(period, docs, filepath, tokenizer, tokenizer_params, vect
     tokenized_period = tokenize(docs, "sentence", 1, tokenizer)
 
     # clear file
-    with open(filepath, "w") as train_docs_file:
-        train_docs_file.write("doc;mask;period")
+    head_file(filepath, "doc;mask;period")
 
     # generate profile and append it to file
     profile = generate_profile(tokenized_period, vectorizer, num)
@@ -327,12 +347,9 @@ if __name__ == "__main__":
             
                 for vectorizer in vectorizers:
 
-                    # delete all train_docs files
-                    files = os.listdir("FR_Test/train_docs")
-                    for file in files:
-                        file_path = os.path.join("FR_Test/train_docs", file)
-                        if os.path.isfile(file_path):
-                            os.remove(file_path)
+                    # delete all train_docs and profile files
+                    clear_dir("FR_Test/train_docs")
+                    clear_dir("FR_Test/profiles")
                     
                     # start threads to generate each profile, store threads in processes
                     processes = []
@@ -384,8 +401,7 @@ if __name__ == "__main__":
                     BATCH_SIZE = 128
                     
                     # clear train_outputs.csv
-                    with open("FR_Test/train_outputs.csv", "w") as train_outputs:
-                        train_outputs.write("output;period")
+                    head_file("FR_Test/train_outputs.csv", "output;period")
                     
                     with open("FR_Test/train_outputs.csv", "a") as train_outputs:
 
@@ -428,8 +444,7 @@ if __name__ == "__main__":
                     test_outputs = []
                     
                     # clear test_outputs.csv
-                    with open("FR_Test/test_outputs.csv", "w") as test_outputs:
-                        test_outputs.write("output;period")
+                    head_file("FR_Test/test_outputs.csv", "output;period")
                     
                     with open("FR_Test/test_outputs.csv", "a") as test_outputs:
                         
@@ -461,16 +476,34 @@ if __name__ == "__main__":
                     estimates = svm.predict(test_outputs_df.loc[:, "output"])
                     
                     # assess the accuracy of the model using Acc, Acc@3, and Acc@5
-                    acc, acc_3, acc_5 = []
+                    acc_data, acc_3_data, acc_5_data = []
                     for i in tqdm(range(len(estimates))):
                         estimate = estimates.item(i)
                         expected = test_years[i]
                         accs = get_accuracy(estimate, expected)
-                        acc.append(accs[0])
-                        acc_3.append(accs[1])
-                        acc_5.append(accs[2])
+                        acc_data.append(accs[0])
+                        acc_3_data.append(accs[1])
+                        acc_5_data.append(accs[2])
                     
                     # print the mean accuracy of the model for each metric
-                    print("Acc:", np.mean(acc))
-                    print("Acc@3:", np.mean(acc_3))
-                    print("Acc@5:", np.mean(acc_5))
+                    acc = np.mean(acc)
+                    acc_3 = np.mean(acc_3)
+                    acc_5 = np.mean(acc_5)
+                    print("Acc:", acc)
+                    print("Acc@3:", acc_3)
+                    print("Acc@5:", acc_5)
+                    
+                    head_file("FR_Test/results.csv", "transformer;chunker_params;vectorizer;acc;acc@3;acc@5")
+                    
+                    result_line = transformer + ";" + str(chunker_params) + ";"
+                    match vectorizer:
+                        case TfidfVectorizer():
+                            result_line += "tf-idf"
+                        case CountVectorizer():
+                            result_line += "count"
+                    result_line += ";" + acc + ";" + acc_3 + ";" + acc_5
+                    
+                    with open("FR_Test/results.csv", "a") as results_file:
+                        results_file.write(result_line)
+
+    print(pd.read_csv("FR_Test/results.csv"))
