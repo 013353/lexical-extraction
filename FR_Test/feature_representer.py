@@ -266,7 +266,7 @@ def get_accuracy(estimate, expected):
         (`bool`, `bool`, `bool`)
     
     """
-    #TODO F1 score
+    
     acc, acc_3, acc_5 = False
     if estimate == expected: acc = True
     if expected-PERIOD_LENGTH <= estimate <= expected+PERIOD_LENGTH: acc_3 = True
@@ -314,7 +314,7 @@ if __name__ == "__main__":
     print("Device:", dev)
 
     # split docs into train and test data
-    train, test = train_test_split(data_df, train_size=0.25)
+    train, test = train_test_split(data_df, train_size=0.3)
 
     # initialize tf-idf and standard vectorizers
     vectorizers = [TfidfVectorizer(), CountVectorizer()]
@@ -485,16 +485,18 @@ if __name__ == "__main__":
                         acc_3_data.append(accs[1])
                         acc_5_data.append(accs[2])
                     
-                    # print the mean accuracy of the model for each metric
+                    # identify the mean accuracy of the model for each metric
                     acc = np.mean(acc)
                     acc_3 = np.mean(acc_3)
                     acc_5 = np.mean(acc_5)
+                    
+                    # print results
                     print("Acc:", acc)
                     print("Acc@3:", acc_3)
                     print("Acc@5:", acc_5)
                     
+                    # add results to results.csv
                     head_file("FR_Test/results.csv", "transformer;chunker_params;vectorizer;acc;acc@3;acc@5")
-                    
                     result_line = transformer + ";" + str(chunker_params) + ";"
                     match vectorizer:
                         case TfidfVectorizer():
@@ -502,8 +504,8 @@ if __name__ == "__main__":
                         case CountVectorizer():
                             result_line += "count"
                     result_line += ";" + acc + ";" + acc_3 + ";" + acc_5
-                    
                     with open("FR_Test/results.csv", "a") as results_file:
                         results_file.write(result_line)
 
+    # print overall test results
     print(pd.read_csv("FR_Test/results.csv"))
