@@ -153,7 +153,7 @@ def add_inputs_to_file(period, docs, filepath, tokenizer, tokenizer_params, vect
     # generate profile and append it to file
     profile = generate_profile(tokenized_period, vectorizer, num)
     with open(filepath, "a") as file:
-        for doc in tokenized_period:
+        for doc in tqdm(tokenized_period, leave=False, desc="Adding to File"):
             mask = []
             for id in doc:
                 mask.append(1 if id in profile else 0)
@@ -281,7 +281,6 @@ if __name__ == "__main__":
 completed = False
 while not completed:
     try:
-        import matplotlib.pyplot as plt
         import numpy as np
         import pandas as pd
         from tqdm import tqdm
@@ -314,13 +313,14 @@ if __name__ == "__main__":
     print("Device:", dev)
 
     # split docs into train and test data
-    train, test = train_test_split(data_df, train_size=0.3)
+    train, test = train_test_split(data_df, train_size=0.2)
 
     # initialize tf-idf and standard vectorizers
-    vectorizers = [TfidfVectorizer(), CountVectorizer()]
+    vectorizers = [CountVectorizer()]
 
     # list chunker parameter combinations
-    chunker_params = [("sentence", 5), ("sentence", 10), ("paragraph", 1), ("paragraph", 2), ("word", 100), ("word", 200), ("word", 300)]
+    chunker_params = [("paragraph", 1), ("sentence", 5), ("word", 100), ("word", 200), ("sentence", 10), ("paragraph", 2), ("word", 300)]
+    # chunker_params = [("sentence", 5), ("sentence", 10), ("paragraph", 1), ("paragraph", 2), ("word", 100), ("word", 200), ("word", 300)]
 
     transformers = ["BERT", "RoBERTa", "Longformer"]    
     for transformer in transformers:
@@ -362,7 +362,7 @@ if __name__ == "__main__":
                     
                     # join profile generator threads and add docs to train_docs dataframe
                     train_docs = pd.DataFrame(columns=["doc", "mask", "period"])
-                    for index in tqdm(range(len(processes)), desc="Joining Profile Generators"):
+                    for index in tqdm(range(len(processes)), desc="Waiting for Profile Generators"):
                         processes[index].join()
                         df = pd.read_csv(f"FR_Test/train_docs/train_docs_{index}.csv", sep=";")
                         train_docs = pd.concat([train_docs, df], ignore_index=True)
@@ -407,7 +407,7 @@ if __name__ == "__main__":
 
                         # pass all docs through the model, batch size specified above
                         NUM_BATCHES_TRAIN  = int(np.ceil(len(train_docs.index)/BATCH_SIZE))
-                        for batch in tqdm(range(NUM_BATCHES_TRAIN)):
+                        for batch in tqdm(range(NUM_BATCHES_TRAIN), desc=transformer):
                             
                             # torch.no_grad() disables gradient calculation to prevent OOM error
                             with torch.no_grad():
