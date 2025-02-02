@@ -153,7 +153,7 @@ def add_inputs_to_file(period, docs, filepath, tokenizer, tokenizer_params, vect
     # generate profile and append it to file
     profile = generate_profile(tokenized_period, vectorizer, num)
     with open(filepath, "a") as file:
-        for doc in tqdm(tokenized_period, leave=False, desc="Adding to File"):
+        for doc in tokenized_period:
             mask = []
             for id in doc:
                 mask.append(1 if id in profile else 0)
@@ -423,7 +423,7 @@ if __name__ == "__main__":
                                 # pass tensors into model, get pooler_output
                                 output = model.forward(input_ids=docs, attention_mask=masks).pooler_output.tolist()
                                 
-                                print(len(output == BATCH_SIZE))
+                                print(len(output) == BATCH_SIZE)
                                 
                                 # add outputs to file
                                 for i in range(BATCH_SIZE):
