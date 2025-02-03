@@ -3,7 +3,6 @@ import re
 from tqdm import tqdm
 import pandas as pd
 import random
-import matplotlib.pyplot as plt
 from shutil import copy2
 import numpy as np
 
@@ -81,5 +80,5 @@ def format_files(dir):
                 write_file.write(formatted_doc)
 
 add_files_to_csv("Documents/All Documents")
-choose_documents("Documents/All Documents", "Documents", 10, 1800, 2020)
+choose_documents("Documents/All Documents", "Documents", 10, 1800, 2000, 75)
 add_files_to_csv("Documents")

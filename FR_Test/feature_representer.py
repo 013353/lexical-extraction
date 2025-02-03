@@ -313,7 +313,7 @@ if __name__ == "__main__":
     print("Device:", dev)
 
     # split docs into train and test data
-    train, test = train_test_split(data_df, train_size=0.2)
+    train, test = train_test_split(data_df, train_size=0.5)
 
     # initialize tf-idf and standard vectorizers
     vectorizers = [CountVectorizer()]
@@ -347,27 +347,31 @@ if __name__ == "__main__":
             
                 for vectorizer in vectorizers:
 
-                    # delete all train_docs and profile files
-                    clear_dir("FR_Test/train_docs")
-                    clear_dir("FR_Test/profiles")
+                    # # delete all train_docs and profile files
+                    # clear_dir("FR_Test/train_docs")
+                    # clear_dir("FR_Test/profiles")
                     
-                    # start threads to generate each profile, store threads in processes
-                    processes = []
-                    i=0
-                    for key, value in tqdm(separate_periods(train).items(), desc="Starting Profile Generators"):
-                        process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/train_docs/train_docs_{i}.csv", tokenizer, chunker_params, vectorizer, i))
-                        processes.append(process)
-                        process.start()
-                        i+=1
+                    # # start threads to generate each profile, store threads in processes
+                    # processes = []
+                    # i=0
+                    # for key, value in tqdm(separate_periods(train).items(), desc="Starting Profile Generators"):
+                    #     process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/train_docs/train_docs_{i}.csv", tokenizer, chunker_params, vectorizer, i))
+                    #     processes.append(process)
+                    #     process.start()
+                    #     i+=1
                     
-                    # join profile generator threads and add docs to train_docs dataframe
+                    # # join profile generator threads and add docs to train_docs dataframe
                     train_docs = pd.DataFrame(columns=["doc", "mask", "period"])
-                    for index in tqdm(range(len(processes)), desc="Waiting for Profile Generators"):
-                        processes[index].join()
+                    # for index in tqdm(range(len(processes)), desc="Waiting for Profile Generators"):
+                    #     processes[index].join()
+                    #     df = pd.read_csv(f"FR_Test/train_docs/train_docs_{index}.csv", sep=";")
+                    #     train_docs = pd.concat([train_docs, df], ignore_index=True)
+                    
+                    for index in tqdm(range(23)):
                         df = pd.read_csv(f"FR_Test/train_docs/train_docs_{index}.csv", sep=";")
                         train_docs = pd.concat([train_docs, df], ignore_index=True)
                     
-                    del processes
+                    # del processes
                         
                     def match_lengths(col, length):
                         """
@@ -413,8 +417,8 @@ if __name__ == "__main__":
                             with torch.no_grad():
                                 
                                 # find first and last indices of batch in train_docs
-                                first = np.floor(BATCH_SIZE * i)
-                                last = np.floor(BATCH_SIZE * (i+1))
+                                first = np.floor(BATCH_SIZE * batch)
+                                last = np.floor(BATCH_SIZE * (batch+1)) - 1
                                 
                                 # convert train docs and masks to GPU tensors
                                 docs = torch.tensor(train_docs.loc[first:last, "doc"].tolist(), device=dev)
@@ -423,7 +427,7 @@ if __name__ == "__main__":
                                 # pass tensors into model, get pooler_output
                                 output = model.forward(input_ids=docs, attention_mask=masks).pooler_output.tolist()
                                 
-                                print(len(output) == BATCH_SIZE)
+                                # print(len(output) == BATCH_SIZE)
                                 
                                 # add outputs to file
                                 for i in range(BATCH_SIZE):
@@ -471,6 +475,8 @@ if __name__ == "__main__":
                     
                     # create a dataframe from the outputs of the model
                     test_outputs_df = pd.read_csv("FR_Test/test_outputs.csv", sep=";")
+                    test_outputs_df["output"] = test_outputs_df["output"].apply(lambda x: eval(x))
+                        
                     
                     # get estimates of the year of each test document from the SVM
                     estimates = svm.predict(test_outputs_df.loc[:, "output"])
