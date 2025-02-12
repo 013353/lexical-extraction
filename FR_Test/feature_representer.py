@@ -310,6 +310,7 @@ if __name__ == "__main__":
 
     # activate PyTorch cuda support if available
     dev = "cuda:0" if torch.cuda.is_available() else "cpu"
+    dev = "cpu"
     print("Device:", dev)
 
     # split docs into train and test data
@@ -361,83 +362,97 @@ if __name__ == "__main__":
                     #     i+=1
                     
                     # # join profile generator threads and add docs to train_docs dataframe
-                    train_docs = pd.DataFrame(columns=["doc", "mask", "period"])
+                    # train_docs = pd.DataFrame(columns=["doc", "mask", "period"])
                     # for index in tqdm(range(len(processes)), desc="Waiting for Profile Generators"):
                     #     processes[index].join()
                     #     df = pd.read_csv(f"FR_Test/train_docs/train_docs_{index}.csv", sep=";")
                     #     train_docs = pd.concat([train_docs, df], ignore_index=True)
                     
-                    for index in tqdm(range(23)):
-                        df = pd.read_csv(f"FR_Test/train_docs/train_docs_{index}.csv", sep=";")
-                        train_docs = pd.concat([train_docs, df], ignore_index=True)
+                    # for index in tqdm(range(23)):
+                    #     df = pd.read_csv(f"FR_Test/train_docs/train_docs_{index}.csv", sep=";")
+                    #     train_docs = pd.concat([train_docs, df], ignore_index=True)
                     
-                    # del processes
+                    # # del processes
                         
-                    def match_lengths(col, length):
-                        """
-                        Sets the length of `col` of `train_docs` to a set length
+                    # def match_lengths(col, length):
+                    #     """
+                    #     Sets the length of `col` of `train_docs` to a set length
                         
-                        Parameters:
-                        -----------
-                        `col`: The column to edit
-                        `length`: The length to adjust to
+                    #     Parameters:
+                    #     -----------
+                    #     `col`: The column to edit
+                    #     `length`: The length to adjust to
                         
-                        """
+                    #     """
                         
-                        # get the specified column of train_docs as a series
-                        series = train_docs.loc[:, col]
+                    #     # get the specified column of train_docs as a series
+                    #     series = train_docs.loc[:, col]
                         
-                        # set the length of each list in the column to len, truncate or pad with 0s if necessary
-                        for i in tqdm(range(len(series)), leave=False):
-                            ls = eval(train_docs.at[i, col])
-                            train_docs.at[i, col] = ls[:length] + [0]*(length-len(ls))
+                    #     # set the length of each list in the column to len, truncate or pad with 0s if necessary
+                    #     for i in tqdm(range(len(series)), leave=False):
+                    #         ls = eval(train_docs.at[i, col])
+                    #         train_docs.at[i, col] = ls[:length] + [0]*(length-len(ls))
 
-                    # set all docs and masks to the same length
-                    match_lengths("doc", max_input_length)
-                    match_lengths("mask", max_input_length)
+                    # # set all docs and masks to the same length
+                    # match_lengths("doc", max_input_length)
+                    # match_lengths("mask", max_input_length)
                     
-                    # shuffle train_docs
-                    train_docs = train_docs.sample(frac=1).reset_index(drop=True)
-
+                    # train_docs.to_csv("FR_Test/train_docs.csv", sep=";")
+                    
+                    # train_docs = pd.read_csv("FR_Test/train_docs.csv")
+                    # print(train_docs)
+                    # train_docs["doc"] = train_docs["doc"].apply(lambda x: eval(x))
+                    # train_docs["mask"] = train_docs["mask"].apply(lambda x: eval(x))
+                    # print("DONE")
+                    # train_docs = pd.read_csv("FR_Test/train_docs.csv")
+                    
+                    # # shuffle train_docs
+                    # train_docs = train_docs.sample(frac=1).reset_index(drop=True)
+                    
                     # initialize SVM
                     svm = LinearSVC()
 
                     BATCH_SIZE = 128
                     
-                    # clear train_outputs.csv
-                    head_file("FR_Test/train_outputs.csv", "output;period")
+                    # # clear train_outputs.csv
+                    # head_file("FR_Test/train_outputs.csv", "output;period")
                     
-                    with open("FR_Test/train_outputs.csv", "a") as train_outputs:
+                    # with open("FR_Test/train_outputs.csv", "a") as train_outputs:
 
-                        # pass all docs through the model, batch size specified above
-                        NUM_BATCHES_TRAIN  = int(np.ceil(len(train_docs.index)/BATCH_SIZE))
-                        for batch in tqdm(range(NUM_BATCHES_TRAIN), desc=transformer):
+                    #     # pass all docs through the model, batch size specified above
+                    #     NUM_BATCHES_TRAIN  = int(np.ceil(len(train_docs.index)/BATCH_SIZE))
+                    #     for batch in tqdm(range(NUM_BATCHES_TRAIN), desc=transformer):
                             
-                            # torch.no_grad() disables gradient calculation to prevent OOM error
-                            with torch.no_grad():
+                    #         # torch.no_grad() disables gradient calculation to prevent OOM error
+                    #         with torch.no_grad():
                                 
-                                # find first and last indices of batch in train_docs
-                                first = np.floor(BATCH_SIZE * batch)
-                                last = np.floor(BATCH_SIZE * (batch+1)) - 1
+                    #             # find first and last indices of batch in train_docs
+                    #             first = np.floor(BATCH_SIZE * batch)
+                    #             last = np.floor(BATCH_SIZE * (batch+1)) - 1
+                    #             if last > len(train_docs.index):
+                    #                 last = len(train_docs.index)
                                 
-                                # convert train docs and masks to GPU tensors
-                                docs = torch.tensor(train_docs.loc[first:last, "doc"].tolist(), device=dev)
-                                masks = torch.tensor(train_docs.loc[first:last, "mask"].tolist(), device=dev)
+                    #             # convert train docs and masks to GPU tensors
+                    #             docs = torch.tensor(train_docs.loc[first:last, "doc"].tolist(), device=dev)
+                    #             masks = torch.tensor(train_docs.loc[first:last, "mask"].tolist(), device=dev)
                                 
-                                # pass tensors into model, get pooler_output
-                                output = model.forward(input_ids=docs, attention_mask=masks).pooler_output.tolist()
+                    #             # pass tensors into model, get pooler_output
+                    #             output = model.forward(input_ids=docs, attention_mask=masks).pooler_output.tolist()
                                 
-                                # print(len(output) == BATCH_SIZE)
+                    #             # print(len(output) == BATCH_SIZE)
                                 
-                                # add outputs to file
-                                for i in range(BATCH_SIZE):
-                                    train_outputs.write(f"\n{output[i]};{train_docs.loc[first+i, "period"]}")
+                    #             # add outputs to file
+                    #             for i in range(BATCH_SIZE):
+                    #                 train_outputs.write(f"\n{output[i]};{train_docs.loc[first+i, "period"]}")
                     
                     # create a dataframe from the outputs of the model
                     train_outputs_df = pd.read_csv("FR_Test/train_outputs.csv", sep=";")
+                    train_outputs_df["output"] = train_outputs_df["output"].apply(lambda x: eval(x))
                     
                     # train the SVM om the outputs
+                    print("Training SVM...")
                     svm.fit(train_outputs_df.loc[:, "output"], train_outputs_df.loc[:, "period"])
+                    print("DONE!")
                     
                     # tokenize test data and store years in test_years
                     tokenized_test = tokenize(test, "sentence", 1, tokenizer)
