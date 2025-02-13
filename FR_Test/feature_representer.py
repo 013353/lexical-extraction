@@ -264,6 +264,23 @@ def separate_periods(df : pd.Dataframe
 
     return periods
 
+def transform_test(tokenized_docs, model, output_file):
+    # torch.no_grad() disables gradient calculation to prevent OOM error
+    with torch.no_grad():
+        # find first and last indices of batch in test data
+        first = np.floor(BATCH_SIZE * i)
+        last = np.floor(BATCH_SIZE * (i+1))
+        
+        # convert test docs to GPU tensor
+        docs = torch.tensor(tokenized_docs[first:last], device=dev)
+        
+        # pass test docs through model, get pooler_output
+        output = model.forward(input_ids=docs).pooler_output.tolist()
+        
+        # add outputs to file
+        for i in range(BATCH_SIZE):
+            output_file.write(f"\n{output[i]};{test_years[first+i]}")
+
 
 def get_accuracy(estimate : int,
                  expected : int
@@ -398,9 +415,9 @@ if __name__ == "__main__":
                         """
                         Sets the length of `col` of `train_docs` to a set length
                         
-                        Parameters
+                        Parameters:
                         -----------
-                        `col`: The column to edit\n
+                        `col`: The column to edit
                         `length`: The length to adjust to
                         
                         """
@@ -466,17 +483,23 @@ if __name__ == "__main__":
                                     train_outputs.write(f"\n{output[i]};{train_docs.loc[first+i, "period"]}")
                     
                     # create a dataframe from the outputs of the model
+                    print("Reading Train Outputs", end="")
                     train_outputs_df = pd.read_csv("FR_Test/train_outputs.csv", sep=";")
+                    print(".", end="")
+                    train_outputs_df = train_outputs_df.sample(frac=0.25).reset_index(drop=True)
+                    print(".", end="")
                     train_outputs_df["output"] = train_outputs_df["output"].apply(lambda x: eval(x))
+                    print(". DONE!")
                     
                     # train the SVM om the outputs
-                    print("Training SVM...")
-                    svm.fit(train_outputs_df.loc[:, "output"], train_outputs_df.loc[:, "period"])
+                    print("Training SVM...", end="")
+                    svm.fit(np.array(train_outputs_df["output"].values.tolist()), np.array(train_outputs_df["period"].values.tolist()))
+                    del train_outputs_df
                     print("DONE!")
                     
                     # tokenize test data and store years in test_years
                     tokenized_test = tokenize(test, "sentence", 1, tokenizer)
-                    test_years = test.loc[:, "year"].tolist()
+                    test_years = test["year"].values.tolist()
                     print(tokenized_test)
                     print(test_years)
                     
@@ -485,31 +508,25 @@ if __name__ == "__main__":
                     # clear test_outputs.csv
                     head_file("FR_Test/test_outputs.csv", "output;period")
                     
+                    processes = []
+                    
                     with open("FR_Test/test_outputs.csv", "a") as test_outputs:
                         
                         # pass all test documents through model
                         NUM_BATCHES_TEST  = int(np.ceil(len(test.index)/BATCH_SIZE))
-                        for i in tqdm(range(NUM_BATCHES_TEST)):
-                            
-                            # torch.no_grad() disables gradient calculation to prevent OOM error
-                            with torch.no_grad():
-                                
-                                # find first and last indices of batch in test data
-                                first = np.floor(BATCH_SIZE * i)
-                                last = np.floor(BATCH_SIZE * (i+1))
-                                
-                                # convert test docs to GPU tensor
-                                docs = torch.tensor(tokenized_test[first:last], device=dev)
-                                
-                                # pass test docs through model, get pooler_output
-                                output = model.forward(input_ids=docs).pooler_output.tolist()
-                                
-                                # add outputs to file
-                                for i in range(BATCH_SIZE):
-                                    test_outputs.write(f"\n{output[i]};{test_years[first+i]}")
-                    
+                        for i in tqdm(range(NUM_BATCHES_TEST), desc="Starting BERT Test"):
+
+                            process = mp.Process(target=transform_test, args=(tokenized_test, model, test_outputs))
+                            processes.append(process)
+                            process.start()
+                        
+                    for process in tqdm(processes, desc="Waiting for BERT"):
+                        process.join()
+
+
                     # create a dataframe from the outputs of the model
                     test_outputs_df = pd.read_csv("FR_Test/test_outputs.csv", sep=";")
+                    test_outputs_df = test_outputs_df.sample(frac=0.25).reset_index(drop=True)
                     test_outputs_df["output"] = test_outputs_df["output"].apply(lambda x: eval(x))
                         
                     
