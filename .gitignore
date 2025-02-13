@@ -1,5 +1,6 @@
 .venv/
 */__pycache__
+*.pyc
 Documents/
 Documents (Copy)/
 Documents (Old)/

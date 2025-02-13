@@ -1,23 +1,26 @@
 PERIOD_LENGTH = 10
 
-def head_file(filepath, header):
+def head_file(filepath : str, 
+              header: str
+              ) -> None:
     """
     Clears the given file and adds a header to it, used for CSV file reset
     
-    Parameters:
+    Parameters
     -----------
-    `filepath`: The file to head
+    `filepath`: The file to head\n
     `header`: The header to add to the file
     """
     
     with open(filepath, "w") as file:
         file.write(header)
         
-def clear_dir(directory):
+def clear_dir(directory : str
+              ) -> None:
     """
     Removes all files from the given directory
     
-    Parameters:
+    Parameters
     -----------
     `directory`: The directory to clear
     """
@@ -28,20 +31,22 @@ def clear_dir(directory):
         if os.path.isfile(file_path):
             os.remove(file_path)
 
-def generate_profile(corpus, vectorizer, num):
+def generate_profile(corpus : list,
+                     vectorizer : TfidfVectorizer | CountVectorizer,
+                     num : int
+                     ) -> list:
     """
     Generates a profile of the given `corpus` with the middle 75% of ids
     
-    Parameters:
+    Parameters
     -----------
-    `corpus`: The corpus from which to generate a profile
-    `vectorizer`: The vectorizer to weight ids with, this program uses `TfidfVectorizer` and `CountVectorizer` from `sklearn.feature_extraction.text`
+    `corpus`: The corpus from which to generate a profile\n
+    `vectorizer`: The vectorizer to weight ids with, this program uses `TfidfVectorizer` and `CountVectorizer` from `sklearn.feature_extraction.text`\n
     `num`: The process number, used with multiprocessing to keep track of individual processes
     
-    Returns:
+    Returns
     --------
     `list`: Middle 75% of ids, sorted from highest to lowest weight
-    
     """
     
     # convert each doc from a list of ints to a list of strings
@@ -126,21 +131,27 @@ def generate_profile(corpus, vectorizer, num):
     return middle_ids
 
 
-def add_inputs_to_file(period, docs, filepath, tokenizer, tokenizer_params, vectorizer, num):
+def add_inputs_to_file(period : int,
+                       # TODO find type of docs
+                       docs : any,
+                       filepath : str,
+                       tokenizer : any,
+                       tokenizer_params : tuple[str, int],
+                       vectorizer : TfidfVectorizer | CountVectorizer,
+                       num : int 
+                        ) -> None:
     """
     Adds `docs` to `file` with masks and `period` data
     
-    Parameters:
+    Parameters
     -----------
-    `period`: The time period of `docs`
-    `docs`: `pandas.Series` of the documents in the `period`
-    `filepath`: The location of the file to write to
-    `tokenizer`: The algorithm to use to tokenize `docs`
-    `chunker_params` (`mode`, `size`): The set of parameters to pass to the chunker before tokenizing
-        (`str`, `int`)
-    `vectorizer`: The vectorizer to weight ids with, this program uses `TfidfVectorizer` and `CountVectorizer` from `sklearn.feature_extraction.text`
+    `period`: The time period of `docs`\n
+    `docs`: `pandas.Series` of the documents in the `period`\n
+    `filepath`: The location of the file to write to\n
+    `tokenizer`: The algorithm to use to tokenize `docs`\n
+    `chunker_params` (`mode`, `size`): The set of parameters to pass to the chunker before tokenizing\n
+    `vectorizer`: The vectorizer to weight ids with, this program uses `TfidfVectorizer` and `CountVectorizer` from `sklearn.feature_extraction.text`\n
     `num`: The process number, used with multiprocessing to keep track of individual processes
-    
     """
     
     # tokenize each document in the given period
@@ -160,18 +171,22 @@ def add_inputs_to_file(period, docs, filepath, tokenizer, tokenizer_params, vect
             file.write(f"\n{doc};{mask};{period}")
 
     
-def tokenize(dataset, mode, size, model):
+def tokenize(dataset : any, 
+             mode : str["sentence" | "paragraph" | "word"], 
+             size : int, 
+             model: any
+             ) -> list:
     """
     Tokenizes documents from `dataset`
     
-    Parameters:
+    Parameters
     -----------
-    `dataset`: `pandas.Series` of the documents to tokenize
-    `mode` (`"sentence"`, `"paragraph"`, `"word"`): The mode to chunk each document with
-    `size`: The size of each chunk
+    `dataset`: `pandas.Series` of the documents to tokenize\n
+    `mode` (`"sentence"`, `"paragraph"`, `"word"`): The mode to chunk each document with\n
+    `size`: The size of each chunk\n
     `model`: The algorithm to use to tokenize each document
     
-    Returns:
+    Returns
     --------
     `list`: The chunked documents as a 2D list
     
@@ -208,20 +223,21 @@ def tokenize(dataset, mode, size, model):
     return tokenized_chunks
 
 
-def separate_periods(df):
+def separate_periods(df : pd.Dataframe
+                     ) -> dict[int, pd.DataFrame]:
     """
     Separates docs in `df` by period
     
-    Parameters:
+    Parameters
     -----------
-    `df`: The dataframe to separate
+    `df`: The dataframe to separate\n
         `columns` = [`"filepath"`, `"title"`, `"year"`]
     
-    Returns:
+    Returns
     --------
-    `dict`: The documents separated by period
-        `key`: Period
-        `value`: `pandas.DataFrame` of docs in the period
+    `dict`: The documents separated by period\n
+        `key`: Period\n
+        `value`: `pandas.DataFrame` of docs in the period\n
             `columns` = [`"filepath"`, `"title"`, `"year"`]
 
     """
@@ -249,18 +265,20 @@ def separate_periods(df):
     return periods
 
 
-def get_accuracy(estimate, expected):
+def get_accuracy(estimate : int,
+                 expected : int
+                 ) -> tuple[bool, bool, bool]:
     """
     Returns a tuple of bools of if the `estimate` is within each measure of `expected`
     
     `Acc@K` is a measure of accuracy that considers all documents within K/2 periods of expected to be accurate (Ren et al., 2023)
     
-    Parameters:
+    Parameters
     -----------
-    `estimate`: The estimated period
+    `estimate`: The estimated period\n
     `expected`: The actual period
     
-    Returns:
+    Returns
     --------
     `tuple`: (`acc`, `acc@3`, `acc@5`)
         (`bool`, `bool`, `bool`)
@@ -348,102 +366,104 @@ if __name__ == "__main__":
             
                 for vectorizer in vectorizers:
 
-                    # # delete all train_docs and profile files
-                    # clear_dir("FR_Test/train_docs")
-                    # clear_dir("FR_Test/profiles")
+                    # delete all train_docs and profile files
+                    clear_dir("FR_Test/train_docs")
+                    clear_dir("FR_Test/profiles")
                     
-                    # # start threads to generate each profile, store threads in processes
-                    # processes = []
-                    # i=0
-                    # for key, value in tqdm(separate_periods(train).items(), desc="Starting Profile Generators"):
-                    #     process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/train_docs/train_docs_{i}.csv", tokenizer, chunker_params, vectorizer, i))
-                    #     processes.append(process)
-                    #     process.start()
-                    #     i+=1
+                    # start threads to generate each profile, store threads in processes
+                    processes = []
+                    i=0
+                    for key, value in tqdm(separate_periods(train).items(), desc="Starting Profile Generators"):
+                        process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/train_docs/train_docs_{i}.csv", tokenizer, chunker_params, vectorizer, i))
+                        processes.append(process)
+                        process.start()
+                        i+=1
                     
-                    # # join profile generator threads and add docs to train_docs dataframe
-                    # train_docs = pd.DataFrame(columns=["doc", "mask", "period"])
-                    # for index in tqdm(range(len(processes)), desc="Waiting for Profile Generators"):
-                    #     processes[index].join()
-                    #     df = pd.read_csv(f"FR_Test/train_docs/train_docs_{index}.csv", sep=";")
-                    #     train_docs = pd.concat([train_docs, df], ignore_index=True)
+                    # join profile generator threads and add docs to train_docs dataframe
+                    train_docs = pd.DataFrame(columns=["doc", "mask", "period"])
+                    for index in tqdm(range(len(processes)), desc="Waiting for Profile Generators"):
+                        processes[index].join()
+                        df = pd.read_csv(f"FR_Test/train_docs/train_docs_{index}.csv", sep=";")
+                        train_docs = pd.concat([train_docs, df], ignore_index=True)
                     
-                    # for index in tqdm(range(23)):
-                    #     df = pd.read_csv(f"FR_Test/train_docs/train_docs_{index}.csv", sep=";")
-                    #     train_docs = pd.concat([train_docs, df], ignore_index=True)
+                    for index in tqdm(range(23)):
+                        df = pd.read_csv(f"FR_Test/train_docs/train_docs_{index}.csv", sep=";")
+                        train_docs = pd.concat([train_docs, df], ignore_index=True)
                     
-                    # # del processes
+                    # del processes
                         
-                    # def match_lengths(col, length):
-                    #     """
-                    #     Sets the length of `col` of `train_docs` to a set length
+                    def match_lengths(col : str, 
+                                      length : int
+                                      ) -> None:
+                        """
+                        Sets the length of `col` of `train_docs` to a set length
                         
-                    #     Parameters:
-                    #     -----------
-                    #     `col`: The column to edit
-                    #     `length`: The length to adjust to
+                        Parameters
+                        -----------
+                        `col`: The column to edit\n
+                        `length`: The length to adjust to
                         
-                    #     """
+                        """
                         
-                    #     # get the specified column of train_docs as a series
-                    #     series = train_docs.loc[:, col]
+                        # get the specified column of train_docs as a series
+                        series = train_docs.loc[:, col]
                         
-                    #     # set the length of each list in the column to len, truncate or pad with 0s if necessary
-                    #     for i in tqdm(range(len(series)), leave=False):
-                    #         ls = eval(train_docs.at[i, col])
-                    #         train_docs.at[i, col] = ls[:length] + [0]*(length-len(ls))
+                        # set the length of each list in the column to len, truncate or pad with 0s if necessary
+                        for i in tqdm(range(len(series)), leave=False):
+                            ls = eval(train_docs.at[i, col])
+                            train_docs.at[i, col] = ls[:length] + [0]*(length-len(ls))
 
-                    # # set all docs and masks to the same length
-                    # match_lengths("doc", max_input_length)
-                    # match_lengths("mask", max_input_length)
+                    # set all docs and masks to the same length
+                    match_lengths("doc", max_input_length)
+                    match_lengths("mask", max_input_length)
                     
-                    # train_docs.to_csv("FR_Test/train_docs.csv", sep=";")
+                    train_docs.to_csv("FR_Test/train_docs.csv", sep=";")
                     
-                    # train_docs = pd.read_csv("FR_Test/train_docs.csv")
-                    # print(train_docs)
-                    # train_docs["doc"] = train_docs["doc"].apply(lambda x: eval(x))
-                    # train_docs["mask"] = train_docs["mask"].apply(lambda x: eval(x))
-                    # print("DONE")
-                    # train_docs = pd.read_csv("FR_Test/train_docs.csv")
+                    train_docs = pd.read_csv("FR_Test/train_docs.csv")
+                    print(train_docs)
+                    train_docs["doc"] = train_docs["doc"].apply(lambda x: eval(x))
+                    train_docs["mask"] = train_docs["mask"].apply(lambda x: eval(x))
+                    print("DONE")
+                    train_docs = pd.read_csv("FR_Test/train_docs.csv")
                     
-                    # # shuffle train_docs
-                    # train_docs = train_docs.sample(frac=1).reset_index(drop=True)
+                    # shuffle train_docs
+                    train_docs = train_docs.sample(frac=1).reset_index(drop=True)
                     
                     # initialize SVM
                     svm = LinearSVC()
 
                     BATCH_SIZE = 128
                     
-                    # # clear train_outputs.csv
-                    # head_file("FR_Test/train_outputs.csv", "output;period")
+                    # clear train_outputs.csv
+                    head_file("FR_Test/train_outputs.csv", "output;period")
                     
-                    # with open("FR_Test/train_outputs.csv", "a") as train_outputs:
+                    with open("FR_Test/train_outputs.csv", "a") as train_outputs:
 
-                    #     # pass all docs through the model, batch size specified above
-                    #     NUM_BATCHES_TRAIN  = int(np.ceil(len(train_docs.index)/BATCH_SIZE))
-                    #     for batch in tqdm(range(NUM_BATCHES_TRAIN), desc=transformer):
+                        # pass all docs through the model, batch size specified above
+                        NUM_BATCHES_TRAIN  = int(np.ceil(len(train_docs.index)/BATCH_SIZE))
+                        for batch in tqdm(range(NUM_BATCHES_TRAIN), desc=transformer):
                             
-                    #         # torch.no_grad() disables gradient calculation to prevent OOM error
-                    #         with torch.no_grad():
+                            # torch.no_grad() disables gradient calculation to prevent OOM error
+                            with torch.no_grad():
                                 
-                    #             # find first and last indices of batch in train_docs
-                    #             first = np.floor(BATCH_SIZE * batch)
-                    #             last = np.floor(BATCH_SIZE * (batch+1)) - 1
-                    #             if last > len(train_docs.index):
-                    #                 last = len(train_docs.index)
+                                # find first and last indices of batch in train_docs
+                                first = np.floor(BATCH_SIZE * batch)
+                                last = np.floor(BATCH_SIZE * (batch+1)) - 1
+                                if last > len(train_docs.index):
+                                    last = len(train_docs.index)
                                 
-                    #             # convert train docs and masks to GPU tensors
-                    #             docs = torch.tensor(train_docs.loc[first:last, "doc"].tolist(), device=dev)
-                    #             masks = torch.tensor(train_docs.loc[first:last, "mask"].tolist(), device=dev)
+                                # convert train docs and masks to GPU tensors
+                                docs = torch.tensor(train_docs.loc[first:last, "doc"].tolist(), device=dev)
+                                masks = torch.tensor(train_docs.loc[first:last, "mask"].tolist(), device=dev)
                                 
-                    #             # pass tensors into model, get pooler_output
-                    #             output = model.forward(input_ids=docs, attention_mask=masks).pooler_output.tolist()
+                                # pass tensors into model, get pooler_output
+                                output = model.forward(input_ids=docs, attention_mask=masks).pooler_output.tolist()
                                 
-                    #             # print(len(output) == BATCH_SIZE)
+                                # print(len(output) == BATCH_SIZE)
                                 
-                    #             # add outputs to file
-                    #             for i in range(BATCH_SIZE):
-                    #                 train_outputs.write(f"\n{output[i]};{train_docs.loc[first+i, "period"]}")
+                                # add outputs to file
+                                for i in range(BATCH_SIZE):
+                                    train_outputs.write(f"\n{output[i]};{train_docs.loc[first+i, "period"]}")
                     
                     # create a dataframe from the outputs of the model
                     train_outputs_df = pd.read_csv("FR_Test/train_outputs.csv", sep=";")
