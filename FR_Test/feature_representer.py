@@ -1,3 +1,30 @@
+if __name__ == "__main__":
+    print("Importing packages... ")
+
+completed = False
+while not completed:
+    try:
+        import numpy as np
+        import pandas as pd
+        from tqdm import tqdm
+        from sklearn.model_selection import train_test_split
+        from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
+        from sklearn.svm import LinearSVC
+        from transformers import BertTokenizerFast, BertModel, RobertaTokenizerFast, RobertaModel, LongformerTokenizerFast, LongformerModel
+        from transformers.utils import logging
+        import torch
+        import multiprocessing as mp
+        import time
+        import re
+        import os
+        from chunker import chunk_file
+        completed = True
+    except OSError as e:
+        print(e)
+
+# set transformers to only print errors to the console
+logging.set_verbosity_error()
+
 PERIOD_LENGTH = 10
 
 def head_file(filepath : str, 
@@ -132,7 +159,6 @@ def generate_profile(corpus : list,
 
 
 def add_inputs_to_file(period : int,
-                       # TODO find type of docs
                        docs : any,
                        filepath : str,
                        tokenizer : any,
@@ -172,7 +198,7 @@ def add_inputs_to_file(period : int,
 
     
 def tokenize(dataset : any, 
-             mode : str["sentence" | "paragraph" | "word"], 
+             mode : str, 
              size : int, 
              model: any
              ) -> list:
@@ -223,7 +249,7 @@ def tokenize(dataset : any,
     return tokenized_chunks
 
 
-def separate_periods(df : pd.Dataframe
+def separate_periods(df : pd.DataFrame
                      ) -> dict[int, pd.DataFrame]:
     """
     Separates docs in `df` by period
@@ -309,33 +335,6 @@ def get_accuracy(estimate : int,
     
     return acc, acc_3, acc_5
 
-
-if __name__ == "__main__":
-    print("Importing packages... ")
-
-completed = False
-while not completed:
-    try:
-        import numpy as np
-        import pandas as pd
-        from tqdm import tqdm
-        from sklearn.model_selection import train_test_split
-        from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
-        from sklearn.svm import LinearSVC
-        from transformers import BertTokenizerFast, BertModel, RobertaTokenizerFast, RobertaModel, LongformerTokenizerFast, LongformerModel
-        from transformers.utils import logging
-        import torch
-        import multiprocessing as mp
-        import time
-        import re
-        import os
-        from chunker import chunk_file
-        completed = True
-    except OSError as e:
-        print(e)
-
-# set transformers to only print errors to the console
-logging.set_verbosity_error()
 
 if __name__ == "__main__":
     print("\rDONE!")
