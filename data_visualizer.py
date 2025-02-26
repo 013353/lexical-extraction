@@ -24,5 +24,4 @@ def visualize_profiles(model):
 
 if __name__ == "__main__":
     bert = BertTokenizerFast.from_pretrained("google-bert/bert-base-uncased")
-    # print(bert.convert_ids_to_tokens([84663]))
     visualize_profiles(bert)

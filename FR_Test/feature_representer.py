@@ -100,25 +100,39 @@ def generate_profile(corpus : list,
 
     # create a dataframe of the tf-idf score of each token in each document
     token_df = pd.DataFrame.sparse.from_spmatrix(arr, columns=vectorizer.get_feature_names_out())
-    print(token_df)
+    # print(token_df)
+    
+    # transposed = False
+    # while not transposed:
+    #     try:
+    #         token_df = token_df.transpose()
+    #         transposed = True
+    #     except MemoryError:
+    #         time.sleep(60)
+
+    # print(token_df)
 
     del arr
     
     # create a dict of the mean tf-idf score of each token
     weights = {}
-    for index in token_df.index.to_list():
+    for col in token_df.columns.to_list():
         completed = False
         while not completed:
             try:
-                weights[index] = np.mean(token_df.loc[index])
+                weights[col] = np.mean(token_df.loc[:, col])
                 completed = True
             except MemoryError:
                 time.sleep(30)
+    
+    # print(weights)
+    # print(token_df)
                 
     del token_df
     
     # convert mean weight dict to dataframe and sort by weight
     weights_df = pd.DataFrame.from_dict(weights, orient='index', columns=["weight"])
+    # print(weights_df)
     sorted_weights_df = weights_df.sort_values(by=weights_df.columns[0], axis=0, ascending=False)
     del weights_df
     
@@ -426,7 +440,7 @@ if __name__ == "__main__":
     train, test = train_test_split(data_df, train_size=0.5)
 
     # initialize tf-idf and standard vectorizers
-    vectorizers = [CountVectorizer()]
+    vectorizers = [TfidfVectorizer()]
 
     # list chunker parameter combinations
     chunker_params = [("paragraph", 1), ("sentence", 5), ("word", 100), ("word", 200), ("sentence", 10), ("paragraph", 2), ("word", 300)]
@@ -457,43 +471,45 @@ if __name__ == "__main__":
             
                 for vectorizer in vectorizers:
 
-                    # # delete all train_data and profile files
-                    # clear_dir("FR_Test/train_data")
-                    # clear_dir("FR_Test/profiles")
+                    # delete all train_data and profile files
+                    clear_dir("FR_Test/train_data")
+                    clear_dir("FR_Test/profiles")
                     
-                    # # start threads to generate each profile, store threads in processes
-                    # processes = []
-                    # i=0
-                    # for key, value in tqdm(separate_periods(train).items(), desc="Starting Profile Generators"):
-                    #     process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/train_data/train_data_{i}.csv", tokenizer, chunker_params, vectorizer, i, True))
-                    #     processes.append(process)
-                    #     process.start()
-                    #     i+=1
+                    # start threads to generate each profile, store threads in processes
+                    processes = []
+                    i=0
+                    for key, value in tqdm(separate_periods(train).items(), desc="Starting Profile Generators"):
+                        process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/train_data/train_data_{i}.csv", tokenizer, chunker_params, vectorizer, i, True))
+                        processes.append(process)
+                        process.start()
+                        # process.join()
+                        i+=1
                     
-                    # # join profile generator threads and add docs to train_data dataframe
-                    # train_data = pd.DataFrame(columns=["doc", "mask", "period"])
-                    # for index in tqdm(range(len(processes)), desc="Waiting for Profile Generators"):
-                    #     processes[index].join()
-                    #     df = pd.read_csv(f"FR_Test/train_data/train_data_{index}.csv", sep=";")
-                    #     train_data = pd.concat([train_data, df], ignore_index=True)
+                    # join profile generator threads and add docs to train_data dataframe
+                    train_data = pd.DataFrame(columns=["doc", "mask", "period"])
+                    for index in tqdm(range(len(processes)), desc="Waiting for Profile Generators"):
+                        processes[index].join()
+                        df = pd.read_csv(f"FR_Test/train_data/train_data_{index}.csv", sep=";")
+                        train_data = pd.concat([train_data, df], ignore_index=True)
                     
-                    # del processes
+                    del processes
 
-                    # # set all docs and masks to the same length
-                    # match_lengths("doc", max_input_length, train_data)
-                    # match_lengths("mask", max_input_length, train_data)
+                    # set all docs and masks to the same length
+                    match_lengths("doc", max_input_length, train_data)
+                    match_lengths("mask", max_input_length, train_data)
                     
-                    # train_data.to_csv("FR_Test/train_data.csv", sep=";")
+                    train_data.to_csv("FR_Test/train_data.csv", sep=";")
+                    train_data.to_pickle("FR_Test/train_data.pickle")
                     
                     # train_data = pd.read_csv("FR_Test/train_data.csv")
                     # print(train_data)
-                    # train_data["doc"] = train_data["doc"].apply(lambda x: eval(x))
-                    # train_data["mask"] = train_data["mask"].apply(lambda x: eval(x))
+                    # train_data[:, "doc"] = train_data[:, "doc"].apply(lambda x: eval(x))
+                    # train_data[:, "mask"] = train_data[:, "mask"].apply(lambda x: eval(x))
                     # print("DONE")
                     # train_data = pd.read_csv("FR_Test/train_data.csv")
                     
-                    # # shuffle train_data
-                    # train_data = train_data.sample(frac=1).reset_index(drop=True)
+                    # shuffle train_data
+                    train_data = train_data.sample(frac=1).reset_index(drop=True)
 
                     BATCH_SIZE = 128
                     
@@ -502,42 +518,42 @@ if __name__ == "__main__":
                     
                     # with open("FR_Test/train_outputs.csv", "a") as train_outputs:
 
-                    #     # pass all docs through the model, batch size specified above
-                    #     NUM_BATCHES_TRAIN  = int(np.ceil(len(train_data.index)/BATCH_SIZE))
-                    #     for batch in tqdm(range(NUM_BATCHES_TRAIN), desc=transformer):
+                        # pass all docs through the model, batch size specified above
+                        NUM_BATCHES_TRAIN  = int(np.ceil(len(train_data.index)/BATCH_SIZE))
+                        for batch in tqdm(range(NUM_BATCHES_TRAIN), desc=transformer):
                             
                     #         # torch.no_grad() disables gradient calculation to prevent OOM error
                     #         with torch.no_grad():
                                 
-                    #             # find first and last indices of batch in train_data
-                    #             first = np.floor(BATCH_SIZE * batch)
-                    #             last = np.floor(BATCH_SIZE * (batch+1)) - 1
-                    #             if last > len(train_data.index):
-                    #                 last = len(train_data.index)
+                                # find first and last indices of batch in train_data
+                                first = np.floor(BATCH_SIZE * batch)
+                                last = np.floor(BATCH_SIZE * (batch+1)) - 1
+                                if last > len(train_data.index):
+                                    last = len(train_data.index)
                                 
-                    #             # convert train docs and masks to GPU tensors
-                    #             docs = torch.tensor(train_data.loc[first:last, "doc"].tolist(), device=dev)
-                    #             masks = torch.tensor(train_data.loc[first:last, "mask"].tolist(), device=dev)
+                                # convert train docs and masks to GPU tensors
+                                docs = torch.tensor(train_data.loc[first:last, "doc"].tolist(), device=dev)
+                                masks = torch.tensor(train_data.loc[first:last, "mask"].tolist(), device=dev)
                                 
                     #             # pass tensors into model, get pooler_output
                     #             output = model.forward(input_ids=docs, attention_mask=masks).pooler_output.tolist()
                                 
                     #             # print(len(output) == BATCH_SIZE)
                                 
-                    #             # add outputs to file
-                    #             for i in range(BATCH_SIZE):
-                    #                 train_outputs.write(f"\n{output[i]};{train_data.loc[first+i, "period"]}")
+                                # add outputs to file
+                                for i in range(BATCH_SIZE):
+                                    train_outputs.write(f"\n{output[i]};{train_data.loc[first+i, "period"]}")
                     
                     # create a dataframe from the outputs of the model
                     print("Reading Train Outputs...", end="")
-                    # train_outputs_df_temp = pd.read_csv("FR_Test/train_outputs.csv", sep=";")
+                    train_outputs_df = pd.read_csv("FR_Test/train_outputs.csv", sep=";")
                     # print(".", end="")
                     # train_outputs_df_temp = train_outputs_df_temp.sample(frac=0.25).reset_index(drop=True)
                     # print(".", end="")
                     # train_outputs_df_temp["output"] = train_outputs_df_temp["output"].apply(lambda string: eval(string))
 
                     # train_outputs_df.to_pickle("FR_Test/train_outputs.pickle")
-                    train_outputs_df = pd.read_pickle("FR_Test/train_outputs.pickle")
+                    # train_outputs_df = pd.read_pickle("FR_Test/train_outputs.pickle")
                     print(" DONE!")
 
                     print(train_outputs_df)
