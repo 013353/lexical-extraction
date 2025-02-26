@@ -17,7 +17,6 @@ while not completed:
         import time
         import re
         import os
-        import pickle
         from chunker import chunk_file
         completed = True
     except OSError as e:
@@ -101,17 +100,6 @@ def generate_profile(corpus : list,
 
     # create a dataframe of the tf-idf score of each token in each document
     token_df = pd.DataFrame.sparse.from_spmatrix(arr, columns=vectorizer.get_feature_names_out())
-    # print(token_df)
-    
-    # transposed = False
-    # while not transposed:
-    #     try:
-    #         token_df = token_df.transpose()
-    #         transposed = True
-    #     except MemoryError:
-    #         time.sleep(60)
-
-    # print(token_df)
 
     del arr
     
@@ -125,9 +113,6 @@ def generate_profile(corpus : list,
                 completed = True
             except MemoryError:
                 time.sleep(30)
-    
-    # print(weights)
-    # print(token_df)
                 
     del token_df
     
@@ -316,23 +301,6 @@ def separate_periods(df : pd.DataFrame
 
     return periods
 
-# def transform_test(tokenized_docs, model, output_file):
-#     # torch.no_grad() disables gradient calculation to prevent OOM error
-#     with torch.no_grad():
-#         # find first and last indices of batch in test data
-#         first = np.floor(BATCH_SIZE * i)
-#         last = np.floor(BATCH_SIZE * (i+1))
-        
-#         # convert test docs to GPU tensor
-#         docs = torch.tensor(tokenized_docs[first:last], device=dev)
-        
-#         # pass test docs through model, get pooler_output
-#         output = model.forward(input_ids=docs).pooler_output.tolist()
-        
-#         # add outputs to file
-#         for i in range(BATCH_SIZE):
-#             output_file.write(f"\n{output[i]};{test_years[first+i]}")
-
 
 def get_accuracy(estimate : int,
                  expected : int
@@ -445,7 +413,6 @@ if __name__ == "__main__":
 
     # list chunker parameter combinations
     chunker_params = [("paragraph", 1), ("sentence", 5), ("word", 100), ("word", 200), ("sentence", 10), ("paragraph", 2), ("word", 300)]
-    # chunker_params = [("sentence", 5), ("sentence", 10), ("paragraph", 1), ("paragraph", 2), ("word", 100), ("word", 200), ("word", 300)]
 
     transformers = ["BERT", "RoBERTa", "Longformer"]    
     for transformer in transformers:
@@ -502,13 +469,6 @@ if __name__ == "__main__":
                     train_data.to_csv("FR_Test/train_data.csv", sep=";")
                     train_data.to_pickle("FR_Test/train_data.pickle")
                     
-                    # train_data = pd.read_csv("FR_Test/train_data.csv")
-                    # print(train_data)
-                    # train_data[:, "doc"] = train_data[:, "doc"].apply(lambda x: eval(x))
-                    # train_data[:, "mask"] = train_data[:, "mask"].apply(lambda x: eval(x))
-                    # print("DONE")
-                    # train_data = pd.read_csv("FR_Test/train_data.csv")
-                    
                     # shuffle train_data
                     train_data = train_data.sample(frac=1).reset_index(drop=True)
 
@@ -518,42 +478,6 @@ if __name__ == "__main__":
                     head_file("FR_Test/train_outputs.csv", "output;period")
                     
                     train_outputs_df = transformer_model(train_data, model, "FR_Test/train_outputs.csv")
-                    
-                    # with open("FR_Test/train_outputs.csv", "a") as train_outputs:
-
-                    #     # pass all docs through the model, batch size specified above
-                    #     NUM_BATCHES_TRAIN  = int(np.ceil(len(train_data.index)/BATCH_SIZE))
-                    #     for batch in tqdm(range(NUM_BATCHES_TRAIN), desc=transformer):
-                                
-                    #         # torch.no_grad() disables gradient calculation to prevent OOM error
-                    #         with torch.no_grad():
-                                    
-                    #             # find first and last indices of batch in train_data
-                    #             first = np.floor(BATCH_SIZE * batch)
-                    #             last = np.floor(BATCH_SIZE * (batch+1)) - 1
-                    #             if last > len(train_data.index):
-                    #                 last = len(train_data.index)
-                            
-                    #             # convert train docs and masks to GPU tensors
-                    #             docs = torch.tensor(train_data.loc[first:last, "doc"].tolist(), device=dev)
-                    #             masks = torch.tensor(train_data.loc[first:last, "mask"].tolist(), device=dev)
-                            
-                    #             # pass tensors into model, get pooler_output
-                    #             output = model.forward(input_ids=docs, attention_mask=masks).pooler_output.tolist()
-                                
-                    #             # print(len(output) == BATCH_SIZE)
-                                    
-                    #     # add outputs to file
-                    #     for i in range(BATCH_SIZE):
-                    #         train_outputs.write(f"\n{output[i]};{train_data.loc[first+i, "period"]}")
-                    
-                    # # create a dataframe from the outputs of the model
-                    # print("Reading Train Outputs...", end="")
-                    # train_outputs_df = pd.read_csv("FR_Test/train_outputs.csv", sep=";")
-                    # print(".", end="")
-                    # train_outputs_df_temp = train_outputs_df_temp.sample(frac=0.25).reset_index(drop=True)
-                    # print(".", end="")
-                    # train_outputs_df_temp["output"] = train_outputs_df_temp["output"].apply(lambda string: eval(string))
 
                     train_outputs_df.to_pickle("FR_Test/train_outputs.pickle")
                     # train_outputs_df = pd.read_pickle("FR_Test/train_outputs.pickle")
@@ -581,19 +505,6 @@ if __name__ == "__main__":
                     
                     del processes
 
-                    # # tokenize train data and format into DataFrame
-                    # head_file("FR_Test/test_data.csv", "doc;mask;period")
-                    # test_periods = separate_periods(test)
-
-                    # test_docs = tokenize(test, "sentence", 1, tokenizer)
-                    # test_years = test.loc[:, "year"].values.tolist()
-                    # with open("FR_Test/test_data.csv", "a") as test_data_file:
-                    #     for doc_index in range(len(test_docs)):
-                    #         mask = [1]*len(test_docs[doc_index])
-                    #         test_data_file.write(f"{test_docs[doc_index]};{mask};{test_years[doc_index]}")
-                    # test_data = pd.read_csv("FR_Test/test_data.csv", sep=";")
-                    # print(test_data)
-
                     # set all docs and masks to the same length
                     match_lengths("doc", max_input_length, test_data)
                     match_lengths("mask", max_input_length, test_data)
@@ -611,40 +522,6 @@ if __name__ == "__main__":
                     head_file("FR_Test/test_outputs.csv", "output;period")
                     
                     test_outputs_df = transformer_model(test_data, model, "FR_Test/test_outputs.csv")
-
-                    # with open("FR_Test/test_outputs.csv", "a") as test_outputs:
-
-                    #     # pass all docs through the model, batch size specified above
-                    #     NUM_BATCHES_TEST  = int(np.ceil(len(test_data.index)/BATCH_SIZE))
-                    #     for batch in tqdm(range(NUM_BATCHES_TEST), desc=transformer):
-                            
-                    #         # torch.no_grad() disables gradient calculation to prevent OOM error
-                    #         with torch.no_grad():
-                                
-                    #             # find first and last indices of batch in test_data
-                    #             first = np.floor(BATCH_SIZE * batch)
-                    #             last = np.floor(BATCH_SIZE * (batch+1)) - 1
-                    #             if last > len(test_data.index):
-                    #                 last = len(test_data.index)
-                                
-                    #             # convert test docs and masks to GPU tensors
-                    #             docs = torch.tensor(test_data.loc[first:last, "doc"].tolist(), device=dev)
-                    #             masks = torch.tensor(test_data.loc[first:last, "mask"].tolist(), device=dev)
-                                
-                    #             # pass tensors into model, get pooler_output
-                    #             output = model.forward(input_ids=docs, attention_mask=masks).pooler_output.tolist()
-                                
-                    #             # print(len(output) == BATCH_SIZE)
-                                
-                    #             # add outputs to file
-                    #             for i in range(BATCH_SIZE):
-                    #                 test_outputs.write(f"\n{output[i]};{test_data.loc[first+i, "period"]}")
-
-
-                    # # create a dataframe from the outputs of the model
-                    # test_outputs_df = pd.read_csv("FR_Test/test_outputs.csv", sep=";")
-                    # test_outputs_df = test_outputs_df.sample(frac=0.25).reset_index(drop=True)
-                    # test_outputs_df["output"] = test_outputs_df["output"].apply(lambda x: eval(x))
                     
                     # read train_outputs from pickle
                     train_outputs_df = pd.read_pickle("FR_Test/train_outputs.pickle")
