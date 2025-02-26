@@ -187,7 +187,9 @@ def add_inputs_to_file(period : int,
     
     # tokenize each document in the given period
     # returns a list of each document as a list
-    tokenized_period = tokenize(docs, "sentence", 1, tokenizer)
+    tokenizer_mode = tokenizer_params[0]
+    tokenizer_size = tokenizer_params[1]
+    tokenized_period = tokenize(docs, tokenizer_mode, tokenizer_size, tokenizer)
 
     # clear file
     head_file(filepath, "doc;mask;period")
