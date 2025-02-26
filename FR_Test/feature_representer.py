@@ -17,6 +17,7 @@ while not completed:
         import time
         import re
         import os
+        import pickle
         from chunker import chunk_file
         completed = True
     except OSError as e:
@@ -513,60 +514,54 @@ if __name__ == "__main__":
 
                     BATCH_SIZE = 128
                     
-                    # # clear train_outputs.csv
-                    # head_file("FR_Test/train_outputs.csv", "output;period")
+                    # clear train_outputs.csv
+                    head_file("FR_Test/train_outputs.csv", "output;period")
+                    
+                    train_outputs_df = transformer_model(train_data, model, "FR_Test/train_outputs.csv")
                     
                     # with open("FR_Test/train_outputs.csv", "a") as train_outputs:
 
-                        # pass all docs through the model, batch size specified above
-                        NUM_BATCHES_TRAIN  = int(np.ceil(len(train_data.index)/BATCH_SIZE))
-                        for batch in tqdm(range(NUM_BATCHES_TRAIN), desc=transformer):
-                            
+                    #     # pass all docs through the model, batch size specified above
+                    #     NUM_BATCHES_TRAIN  = int(np.ceil(len(train_data.index)/BATCH_SIZE))
+                    #     for batch in tqdm(range(NUM_BATCHES_TRAIN), desc=transformer):
+                                
                     #         # torch.no_grad() disables gradient calculation to prevent OOM error
                     #         with torch.no_grad():
-                                
-                                # find first and last indices of batch in train_data
-                                first = np.floor(BATCH_SIZE * batch)
-                                last = np.floor(BATCH_SIZE * (batch+1)) - 1
-                                if last > len(train_data.index):
-                                    last = len(train_data.index)
-                                
-                                # convert train docs and masks to GPU tensors
-                                docs = torch.tensor(train_data.loc[first:last, "doc"].tolist(), device=dev)
-                                masks = torch.tensor(train_data.loc[first:last, "mask"].tolist(), device=dev)
-                                
+                                    
+                    #             # find first and last indices of batch in train_data
+                    #             first = np.floor(BATCH_SIZE * batch)
+                    #             last = np.floor(BATCH_SIZE * (batch+1)) - 1
+                    #             if last > len(train_data.index):
+                    #                 last = len(train_data.index)
+                            
+                    #             # convert train docs and masks to GPU tensors
+                    #             docs = torch.tensor(train_data.loc[first:last, "doc"].tolist(), device=dev)
+                    #             masks = torch.tensor(train_data.loc[first:last, "mask"].tolist(), device=dev)
+                            
                     #             # pass tensors into model, get pooler_output
                     #             output = model.forward(input_ids=docs, attention_mask=masks).pooler_output.tolist()
                                 
                     #             # print(len(output) == BATCH_SIZE)
-                                
-                                # add outputs to file
-                                for i in range(BATCH_SIZE):
-                                    train_outputs.write(f"\n{output[i]};{train_data.loc[first+i, "period"]}")
+                                    
+                    #     # add outputs to file
+                    #     for i in range(BATCH_SIZE):
+                    #         train_outputs.write(f"\n{output[i]};{train_data.loc[first+i, "period"]}")
                     
-                    # create a dataframe from the outputs of the model
-                    print("Reading Train Outputs...", end="")
-                    train_outputs_df = pd.read_csv("FR_Test/train_outputs.csv", sep=";")
+                    # # create a dataframe from the outputs of the model
+                    # print("Reading Train Outputs...", end="")
+                    # train_outputs_df = pd.read_csv("FR_Test/train_outputs.csv", sep=";")
                     # print(".", end="")
                     # train_outputs_df_temp = train_outputs_df_temp.sample(frac=0.25).reset_index(drop=True)
                     # print(".", end="")
                     # train_outputs_df_temp["output"] = train_outputs_df_temp["output"].apply(lambda string: eval(string))
 
-                    # train_outputs_df.to_pickle("FR_Test/train_outputs.pickle")
+                    train_outputs_df.to_pickle("FR_Test/train_outputs.pickle")
                     # train_outputs_df = pd.read_pickle("FR_Test/train_outputs.pickle")
-                    print(" DONE!")
+                    # print(" DONE!")
 
                     print(train_outputs_df)
 
-                    # initialize SVM
-                    svm = LinearSVC(dual=False, max_iter=10000000)
-                    
-                    # train the SVM om the outputs
-                    svm_start_time = time.time()
-                    print("Training SVM... ", end="")
-                    svm.fit(np.array(train_outputs_df["output"].values.tolist()), np.array(train_outputs_df["period"].values.tolist()))
                     del train_outputs_df
-                    print("DONE! (" + time.strftime("%H:%M:%S", time.gmtime(time.time()-svm_start_time)) + ")")
                     
                     # start threads to generate each profile, store threads in processes
                     processes = []
@@ -650,7 +645,18 @@ if __name__ == "__main__":
                     # test_outputs_df = pd.read_csv("FR_Test/test_outputs.csv", sep=";")
                     # test_outputs_df = test_outputs_df.sample(frac=0.25).reset_index(drop=True)
                     # test_outputs_df["output"] = test_outputs_df["output"].apply(lambda x: eval(x))
-                        
+                    
+                    # read train_outputs from pickle
+                    train_outputs_df = pd.read_pickle("FR_Test/train_outputs.pickle")
+
+                    # initialize SVM
+                    svm = LinearSVC(dual=False, max_iter=10000000)
+                    
+                    # train the SVM om the training outputs
+                    svm_start_time = time.time()
+                    print("Training SVM... ", end="")
+                    svm.fit(np.array(train_outputs_df["output"].values.tolist()), np.array(train_outputs_df["period"].values.tolist()))
+                    print("DONE! (" + time.strftime("%H:%M:%S", time.gmtime(time.time()-svm_start_time)) + ")")    
                     
                     # get estimates of the year of each test document from the SVM
                     estimates = svm.predict(test_outputs_df.loc[:, "output"])
