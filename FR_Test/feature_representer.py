@@ -130,6 +130,10 @@ def generate_profile(corpus : list,
     weights_mean = np.mean(range(len(weights_x)))
     weights_std = np.std(range(len(weights_x)))
     
+    # # maybe this is better?
+    # weights_mean = np.mean(weights_x)
+    # weights_std = np.std(weights_x)
+    
     def bell_curve(x, std, mean, mult=1):
         return mult/(std * np.sqrt(2 * np.pi)) * np.e**( - (x - mean)**2 / (2 * std**2))
     
@@ -358,7 +362,16 @@ def transformer_model(data : pd.DataFrame,
                       transformer : any,
                       output_filepath : str
                       ) -> pd.DataFrame:
-    #TODO docstring
+    """Runs the given transformer model on the given data
+
+    Args:
+        data (pd.DataFrame): the data to run on
+        transformer (any): the transformer model to use, such as `BERT` or `RoBERTa` or `Longformer`
+        output_filepath (str): the file to print output data to
+
+    Returns:
+        pd.DataFrame: the output data of the transformer
+    """
 
     with open(output_filepath, "a") as output_file:
 
