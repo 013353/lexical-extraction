@@ -409,10 +409,10 @@ if __name__ == "__main__":
     train, test = train_test_split(data_df, train_size=0.5)
 
     # initialize tf-idf and standard vectorizers
-    vectorizers = [TfidfVectorizer()]
+    vectorizers = [TfidfVectorizer(), CountVectorizer()]
 
     # list chunker parameter combinations
-    chunker_params = [("paragraph", 1), ("sentence", 5), ("word", 100), ("word", 200), ("sentence", 10), ("paragraph", 2), ("word", 300)]
+    chunker_params = [("paragraph", 1), ("sentence", 3), ("word", 100), ("word", 200), ("sentence", 5), ("paragraph", 2)]
 
     transformers = ["BERT", "RoBERTa", "Longformer"]    
     for transformer in transformers:
