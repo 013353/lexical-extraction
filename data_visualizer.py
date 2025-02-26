@@ -13,10 +13,11 @@ def visualize_profiles(model):
     for prf in tqdm(profile_files):
         profile = pd.read_csv("FR_Test/profiles/" + prf, header=0, names=["token", "weight"])
         print(profile)
-        # input()
+        input()
         profile.loc[:, "token"] = model.convert_ids_to_tokens(profile.loc[:, "token"].values.tolist())
         profiles.append(profile)
         print(profile)
+        profile.to_csv("temp_data.csv")
     
     # for profile in profiles:
     #     print(profile)

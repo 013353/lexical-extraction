@@ -251,7 +251,7 @@ def tokenize(dataset : any,
     # create a list of each chunk, tokenized
     tokenized_chunks = []
     for doc in chunked_docs:
-        for chunk in doc:
+        for chunk in tqdm(doc, desc="Tokenizing", leave=False):
             
             # split each chunk into words
             words = chunk.split()
@@ -513,17 +513,17 @@ if __name__ == "__main__":
 
                     BATCH_SIZE = 128
                     
-                    # clear train_outputs.csv
-                    head_file("FR_Test/train_outputs.csv", "output;period")
+                    # # clear train_outputs.csv
+                    # head_file("FR_Test/train_outputs.csv", "output;period")
                     
-                    with open("FR_Test/train_outputs.csv", "a") as train_outputs:
+                    # with open("FR_Test/train_outputs.csv", "a") as train_outputs:
 
                         # pass all docs through the model, batch size specified above
                         NUM_BATCHES_TRAIN  = int(np.ceil(len(train_data.index)/BATCH_SIZE))
                         for batch in tqdm(range(NUM_BATCHES_TRAIN), desc=transformer):
                             
-                            # torch.no_grad() disables gradient calculation to prevent OOM error
-                            with torch.no_grad():
+                    #         # torch.no_grad() disables gradient calculation to prevent OOM error
+                    #         with torch.no_grad():
                                 
                                 # find first and last indices of batch in train_data
                                 first = np.floor(BATCH_SIZE * batch)
@@ -535,10 +535,10 @@ if __name__ == "__main__":
                                 docs = torch.tensor(train_data.loc[first:last, "doc"].tolist(), device=dev)
                                 masks = torch.tensor(train_data.loc[first:last, "mask"].tolist(), device=dev)
                                 
-                                # pass tensors into model, get pooler_output
-                                output = model.forward(input_ids=docs, attention_mask=masks).pooler_output.tolist()
+                    #             # pass tensors into model, get pooler_output
+                    #             output = model.forward(input_ids=docs, attention_mask=masks).pooler_output.tolist()
                                 
-                                # print(len(output) == BATCH_SIZE)
+                    #             # print(len(output) == BATCH_SIZE)
                                 
                                 # add outputs to file
                                 for i in range(BATCH_SIZE):
