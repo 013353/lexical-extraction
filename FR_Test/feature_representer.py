@@ -377,7 +377,7 @@ def transformer_model(data : pd.DataFrame,
 
         # pass all docs through the model, batch size specified above
         NUM_BATCHES  = int(np.ceil(len(data.index)/BATCH_SIZE))
-        for batch in tqdm(range(NUM_BATCHES), desc=transformer):
+        for batch in tqdm(range(NUM_BATCHES), desc="Transforming"):
             
             # torch.no_grad() disables gradient calculation to prevent OOM error
             with torch.no_grad():
