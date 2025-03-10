@@ -243,7 +243,7 @@ def tokenize(dataset : any,
     # create a list of each chunk, tokenized
     tokenized_chunks = []
     for doc in chunked_docs:
-        for chunk in tqdm(doc, desc="Tokenizing", leave=False):
+        for chunk in doc:
             
             # split each chunk into words
             words = chunk.split()
@@ -417,7 +417,6 @@ if __name__ == "__main__":
 
     # activate PyTorch cuda support if available
     dev = "cuda:0" if torch.cuda.is_available() else "cpu"
-    dev = "cpu"
     print("Device:", dev)
 
     # split docs into train and test data
