@@ -2,8 +2,6 @@
 .vscode/
 */__pycache__
 *.pyc
-Documents/
-Documents (Copy)/
-Documents (Old)/
 *.csv
+!*/_doc_data.csv
 *.pickle
