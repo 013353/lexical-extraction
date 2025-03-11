@@ -398,7 +398,7 @@ def transformer_model(data : pd.DataFrame,
                 # print(len(output) == BATCH_SIZE)
                 
                 # add outputs to file
-                for i in range(BATCH_SIZE):
+                for i in range(last-first):
                     output_file.write(f"\n{output[i]};{data.loc[first+i, "period"]}")
 
     # create a dataframe from the outputs of the model
