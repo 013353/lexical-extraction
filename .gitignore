@@ -1,7 +1,7 @@
 .venv/
 .vscode/
+Documents/
 */__pycache__
 *.pyc
 *.csv
-!*/_doc_data.csv
 *.pickle

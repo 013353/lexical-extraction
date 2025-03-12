@@ -5,4 +5,3 @@ Scraper/IBEUNESCO/IBEUNESCO_3.xml linguist-vendored
 Scraper/TCP/TCP_EEBO.html linguist-vendored
 Scraper/TCP/TCP_ECCO.html linguist-vendored
 Scraper/TCP/TCP_EVANS.html linguist-vendored
-*.txt filter=lfs diff=lfs merge=lfs -text
