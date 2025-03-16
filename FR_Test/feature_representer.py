@@ -328,10 +328,10 @@ def get_accuracy(estimate : int,
     
     """
     
-    acc, acc_3, acc_5 = False
-    if estimate == expected: acc = True
-    if expected-PERIOD_LENGTH <= estimate <= expected+PERIOD_LENGTH: acc_3 = True
-    if expected-2*PERIOD_LENGTH <= estimate <= expected+2*PERIOD_LENGTH: acc_5 = True
+    acc, acc_3, acc_5 = 0
+    if estimate == expected: acc = 1
+    if expected-PERIOD_LENGTH <= estimate <= expected+PERIOD_LENGTH: acc_3 = 1
+    if expected-2*PERIOD_LENGTH <= estimate <= expected+2*PERIOD_LENGTH: acc_5 = 1
     
     return acc, acc_3, acc_5
 
@@ -453,89 +453,100 @@ if __name__ == "__main__":
             
                 for vectorizer in vectorizers:
 
-                    # delete all train_data and profile files
-                    clear_dir("FR_Test/train_data")
-                    clear_dir("FR_Test/profiles")
-                    
-                    # start threads to generate each profile, store threads in processes
-                    processes = []
-                    i=0
-                    for key, value in tqdm(separate_periods(train).items(), desc="Starting Profile Generators"):
-                        process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/train_data/train_data_{i}.csv", tokenizer, chunker_params, vectorizer, i, True))
-                        processes.append(process)
-                        process.start()
-                        # process.join()
-                        i+=1
-                    
-                    # join profile generator threads and add docs to train_data dataframe
-                    train_data = pd.DataFrame(columns=["doc", "mask", "period"])
-                    for index in tqdm(range(len(processes)), desc="Waiting for Profile Generators"):
-                        processes[index].join()
-                        df = pd.read_csv(f"FR_Test/train_data/train_data_{index}.csv", sep=";")
-                        train_data = pd.concat([train_data, df], ignore_index=True)
-                    
-                    del processes
+                    if not (transformer == "BERT" and chunker_params == ("paragraph", 1) and type(vectorizer) == type(TfidfVectorizer())):
 
-                    # set all docs and masks to the same length
-                    match_lengths("doc", max_input_length, train_data)
-                    match_lengths("mask", max_input_length, train_data)
-                    
-                    train_data.to_csv("FR_Test/train_data.csv", sep=";")
-                    train_data.to_pickle("FR_Test/train_data.pickle")
-                    
-                    # shuffle train_data
-                    train_data = train_data.sample(frac=1).reset_index(drop=True)
+                        # delete all train_data and profile files
+                        clear_dir("FR_Test/train_data")
+                        clear_dir("FR_Test/profiles")
+                        
+                        # start threads to generate each profile, store threads in processes
+                        processes = []
+                        i=0
+                        for key, value in tqdm(separate_periods(train).items(), desc="Starting Profile Generators"):
+                            process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/train_data/train_data_{i}.csv", tokenizer, chunker_params, vectorizer, i, True))
+                            processes.append(process)
+                            process.start()
+                            # process.join()
+                            i+=1
+                        
+                        # join profile generator threads and add docs to train_data dataframe
+                        train_data = pd.DataFrame(columns=["doc", "mask", "period"])
+                        for index in tqdm(range(len(processes)), desc="Waiting for Profile Generators"):
+                            processes[index].join()
+                            df = pd.read_csv(f"FR_Test/train_data/train_data_{index}.csv", sep=";")
+                            train_data = pd.concat([train_data, df], ignore_index=True)
+                        
+                        del processes
 
-                    BATCH_SIZE = 128
+                        # set all docs and masks to the same length
+                        match_lengths("doc", max_input_length, train_data)
+                        match_lengths("mask", max_input_length, train_data)
+                        
+                        train_data.to_csv("FR_Test/train_data.csv", sep=";")
+                        train_data.to_pickle("FR_Test/train_data.pickle")
                     
-                    # clear train_outputs.csv
-                    head_file("FR_Test/train_outputs.csv", "output;period")
                     
-                    train_outputs_df = transformer_model(train_data, model, "FR_Test/train_outputs.csv")
+                        # shuffle train_data
+                        train_data = train_data.sample(frac=1).reset_index(drop=True)
 
-                    train_outputs_df.to_pickle("FR_Test/train_outputs.pickle")
-                    # train_outputs_df = pd.read_pickle("FR_Test/train_outputs.pickle")
-                    # print(" DONE!")
+                        BATCH_SIZE = 128
+                        
+                        # clear train_outputs.csv
+                        head_file("FR_Test/train_outputs.csv", "output;period")
+                        
+                        train_outputs_df = transformer_model(train_data, model, "FR_Test/train_outputs.csv")
 
-                    print(train_outputs_df)
+                        train_outputs_df.to_pickle("FR_Test/train_outputs.pickle")
+                        # train_outputs_df = pd.read_pickle("FR_Test/train_outputs.pickle")
+                        # print(" DONE!")
 
-                    del train_outputs_df
-                    
-                    # start threads to generate each profile, store threads in processes
-                    processes = []
-                    i=0
-                    for key, value in tqdm(separate_periods(test).items(), desc="Starting Profile Generators"):
-                        process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/test_data/test_data_{i}.csv", tokenizer, chunker_params, vectorizer, i, False))
-                        processes.append(process)
-                        process.start()
-                        i+=1
-                    
-                    # join profile generator threads and add docs to test_data dataframe
-                    test_data = pd.DataFrame(columns=["doc", "mask", "period"])
-                    for index in tqdm(range(len(processes)), desc="Waiting for Profile Generators"):
-                        processes[index].join()
-                        df = pd.read_csv(f"FR_Test/test_data/test_data_{index}.csv", sep=";")
-                        test_data = pd.concat([test_data, df], ignore_index=True)
-                    
-                    del processes
+                        print(train_outputs_df)
 
-                    # set all docs and masks to the same length
-                    match_lengths("doc", max_input_length, test_data)
-                    match_lengths("mask", max_input_length, test_data)
-                    
-                    test_data.to_csv("FR_Test/test_data.csv", sep=";")
-                    test_data.to_pickle("FR_Test/test_data.pickle")
-                    print(test_data)
-                    
-                    # shuffle test_data
-                    test_data = test_data.sample(frac=1).reset_index(drop=True)
+                        del train_outputs_df
+                        
+                        # start threads to generate each profile, store threads in processes
+                        processes = []
+                        i=0
+                        for key, value in tqdm(separate_periods(test).items(), desc="Starting Profile Generators"):
+                            process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/test_data/test_data_{i}.csv", tokenizer, chunker_params, vectorizer, i, False))
+                            processes.append(process)
+                            process.start()
+                            i+=1
+                        
+                        # join profile generator threads and add docs to test_data dataframe
+                        test_data = pd.DataFrame(columns=["doc", "mask", "period"])
+                        for index in tqdm(range(len(processes)), desc="Waiting for Profile Generators"):
+                            processes[index].join()
+                            df = pd.read_csv(f"FR_Test/test_data/test_data_{index}.csv", sep=";")
+                            test_data = pd.concat([test_data, df], ignore_index=True)
+                        
+                        del processes
 
-                    BATCH_SIZE = 128
+                        # set all docs and masks to the same length
+                        match_lengths("doc", max_input_length, test_data)
+                        match_lengths("mask", max_input_length, test_data)
+                        
+                        test_data.to_csv("FR_Test/test_data.csv", sep=";")
+                        test_data.to_pickle("FR_Test/test_data.pickle")
+                        print(test_data)
+                        
+                        # shuffle test_data
+                        test_data = test_data.sample(frac=1).reset_index(drop=True)
+
+                        BATCH_SIZE = 128
+                        
+                        # clear test_outputs.csv
+                        head_file("FR_Test/test_outputs.csv", "output;period")
+                        
+                        test_outputs_df = transformer_model(test_data, model, "FR_Test/test_outputs.csv")
                     
-                    # clear test_outputs.csv
-                    head_file("FR_Test/test_outputs.csv", "output;period")
-                    
-                    test_outputs_df = transformer_model(test_data, model, "FR_Test/test_outputs.csv")
+                    else:
+                        test_outputs_df = pd.read_csv("FR_Test/test_outputs.csv")
+                        test_outputs_df["output"] = test_outputs_df["output"].apply(lambda x: eval(x))
+                        test_outputs_df.to_pickle("FR_Test/test_outputs.pickle")
+                        print(test_outputs_df)
+                        del test_outputs_df
+
                     
                     # read train_outputs from pickle
                     train_outputs_df = pd.read_pickle("FR_Test/train_outputs.pickle")
@@ -548,14 +559,20 @@ if __name__ == "__main__":
                     print("Training SVM... ", end="")
                     svm.fit(np.array(train_outputs_df["output"].values.tolist()), np.array(train_outputs_df["period"].values.tolist()))
                     print("DONE! (" + time.strftime("%H:%M:%S", time.gmtime(time.time()-svm_start_time)) + ")")    
+
+                    del train_outputs_df
+
+                    test_outputs_df = pd.read_pickle("FR_Test/test_outputs.pickle")
                     
                     # get estimates of the year of each test document from the SVM
                     estimates = svm.predict(test_outputs_df.loc[:, "output"])
+
+                    del test_outputs_df
                     
                     # assess the accuracy of the model using Acc, Acc@3, and Acc@5
                     expected_years = test_data.loc[:, "period"].values.tolist()
                     acc_data, acc_3_data, acc_5_data = []
-                    for i in tqdm(range(len(estimates))):
+                    for i in tqdm(range(len(estimates)), desc="Evaluating Accuracy"):
                         estimate = estimates.item(i)
                         expected = expected_years[i]
                         accs = get_accuracy(estimate, expected)
@@ -585,5 +602,5 @@ if __name__ == "__main__":
                     with open("FR_Test/results.csv", "a") as results_file:
                         results_file.write(result_line)
 
-    # print overall test results
-    print(pd.read_csv("FR_Test/results.csv"))
+                    # print overall test results
+                    print(pd.read_csv("FR_Test/results.csv"))
