@@ -240,7 +240,9 @@ def tokenize(dataset : any,
     for i, row in dataset.iterrows():
         chunked_docs.extend(chunk_file(row["filepath"], mode, size))
 
-    chunked_docs = sample_chunks(chunked_docs, 1000)
+    chunked_docs = sample_chunks(chunked_docs, 5000)
+    # if len(chunked_docs) != 5000:
+    #     print(len(chunked_docs))
     
     # create a list of each chunk, tokenized
     tokenized_chunks = []
@@ -566,7 +568,7 @@ if __name__ == "__main__":
                     train_outputs_df = pd.read_pickle("FR_Test/train_outputs.pickle")
 
                     # initialize SVM
-                    svm = LinearSVC(dual=False, max_iter=10000000)
+                    svm = LinearSVC(max_iter=10000000)
                     
                     # train the SVM om the training outputs
                     svm_start_time = time.time()
@@ -579,7 +581,10 @@ if __name__ == "__main__":
                     test_outputs_df = pd.read_pickle("FR_Test/test_outputs.pickle")
                     
                     # get estimates of the year of each test document from the SVM
-                    estimates = svm.predict(test_outputs_df.loc[:, "output"])
+                    svm_start_time = time.time()
+                    print("Training SVM... ", end="")
+                    estimates = svm.predict(test_outputs_df["output"].tolist())
+                    print("DONE! (" + time.strftime("%H:%M:%S", time.gmtime(time.time()-svm_start_time)) + ")")    
 
                     del test_outputs_df
                     
