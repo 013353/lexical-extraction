@@ -240,9 +240,10 @@ def tokenize(dataset : any,
     for i, row in dataset.iterrows():
         chunked_docs.extend(chunk_file(row["filepath"], mode, size))
 
-    chunked_docs = sample_chunks(chunked_docs, 5000)
-    # if len(chunked_docs) != 5000:
-    #     print(len(chunked_docs))
+    # print("\n", len(chunked_docs))
+    chunked_docs = sample_chunks(chunked_docs, 25000)
+    if len(chunked_docs) != 25000:
+        print(len(chunked_docs))
     
     # create a list of each chunk, tokenized
     tokenized_chunks = []
@@ -291,7 +292,7 @@ def separate_periods(df : pd.DataFrame
     
     # sort docs by year, print result
     docs_df = df.sort_values(by="year")
-    print(docs_df)
+    # print(docs_df)
     
     # separate docs_df into periods and add docs as a dataframe to periods
     for index, row in tqdm(docs_df.iterrows(), total=len(docs_df.index), desc="Separating Documents"):
@@ -516,7 +517,7 @@ if __name__ == "__main__":
                     # train_outputs_df = pd.read_pickle("FR_Test/train_outputs.pickle")
                     # print(" DONE!")
 
-                    print(train_outputs_df)
+                    # print(train_outputs_df)
 
                     del train_outputs_df
                     
@@ -544,7 +545,7 @@ if __name__ == "__main__":
                     
                     test_data.to_csv("FR_Test/test_data.csv", sep=";")
                     test_data.to_pickle("FR_Test/test_data.pickle")
-                    print(test_data)
+                    # print(test_data)
                     
                     # shuffle test_data
                     test_data = test_data.sample(frac=1).reset_index(drop=True)
@@ -590,7 +591,7 @@ if __name__ == "__main__":
                     
                     # assess the accuracy of the model using Acc, Acc@3, and Acc@5
                     expected_years = test_data.loc[:, "period"].values.tolist()
-                    acc_data, acc_3_data, acc_5_data = []
+                    acc_data = acc_3_data = acc_5_data = []
                     for i in tqdm(range(len(estimates)), desc="Evaluating Accuracy"):
                         estimate = estimates.item(i)
                         expected = expected_years[i]
