@@ -118,7 +118,6 @@ def generate_profile(corpus : list,
     
     # convert mean weight dict to dataframe and sort by weight
     weights_df = pd.DataFrame.from_dict(weights, orient='index', columns=["weight"])
-    # print(weights_df)
     sorted_weights_df = weights_df.sort_values(by=weights_df.columns[0], axis=0, ascending=False)
     del weights_df
     
@@ -199,7 +198,7 @@ def add_inputs_to_file(period : int,
     head_file(filepath, "doc;mask;period")
 
     if generate_profile_and_mask:
-        # generate profile and append it to file
+        # generate profile and append it to file if being used for training
         profile = generate_profile(tokenized_period, vectorizer, num)
         with open(filepath, "a") as file:
             for doc in tokenized_period:
@@ -208,6 +207,7 @@ def add_inputs_to_file(period : int,
                     mask.append(1 if id in profile else 0)
                 file.write(f"\n{doc};{mask};{period}")
     else:
+        # add masks of 1s of same length as chunks if being used for training
         with open(filepath, "a") as file:
             for doc in tokenized_period:
                 mask = [1]*len(doc)
@@ -240,10 +240,8 @@ def tokenize(dataset : any,
     for i, row in dataset.iterrows():
         chunked_docs.extend(chunk_file(row["filepath"], mode, size))
 
-    # print("\n", len(chunked_docs))
+    # take a random 25000 chunks from chunked_docs
     chunked_docs = sample_chunks(chunked_docs, 25000)
-    if len(chunked_docs) != 25000:
-        print(len(chunked_docs))
     
     # create a list of each chunk, tokenized
     tokenized_chunks = []
@@ -470,8 +468,6 @@ if __name__ == "__main__":
             
                 for vectorizer in vectorizers:
 
-                    # if not (transformer == "BERT" and chunker_params == ("paragraph", 1) and type(vectorizer) == type(TfidfVectorizer())):
-
                     # delete all train_data and profile files
                     clear_dir("FR_Test/train_data")
                     clear_dir("FR_Test/profiles")
@@ -483,7 +479,6 @@ if __name__ == "__main__":
                         process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/train_data/train_data_{i}.csv", tokenizer, chunker_params, vectorizer, i, True))
                         processes.append(process)
                         process.start()
-                        # process.join()
                         i+=1
                     
                     # join profile generator threads and add docs to train_data dataframe
@@ -499,6 +494,7 @@ if __name__ == "__main__":
                     match_lengths("doc", max_input_length, train_data)
                     match_lengths("mask", max_input_length, train_data)
                     
+                    # save train_data to a CSV file and serialize as a pickle
                     train_data.to_csv("FR_Test/train_data.csv", sep=";")
                     train_data.to_pickle("FR_Test/train_data.pickle")
                 
@@ -511,13 +507,11 @@ if __name__ == "__main__":
                     # clear train_outputs.csv
                     head_file("FR_Test/train_outputs.csv", "output;period")
                     
+                    # pass the train data through the transformer model and save to CSV
                     train_outputs_df = transformer_model(train_data, model, "FR_Test/train_outputs.csv")
 
+                    # serialize transformer model output
                     train_outputs_df.to_pickle("FR_Test/train_outputs.pickle")
-                    # train_outputs_df = pd.read_pickle("FR_Test/train_outputs.pickle")
-                    # print(" DONE!")
-
-                    # print(train_outputs_df)
 
                     del train_outputs_df
                     
@@ -543,9 +537,9 @@ if __name__ == "__main__":
                     match_lengths("doc", max_input_length, test_data)
                     match_lengths("mask", max_input_length, test_data)
                     
+                    # save test data to CSV and serialize
                     test_data.to_csv("FR_Test/test_data.csv", sep=";")
                     test_data.to_pickle("FR_Test/test_data.pickle")
-                    # print(test_data)
                     
                     # shuffle test_data
                     test_data = test_data.sample(frac=1).reset_index(drop=True)
@@ -556,15 +550,7 @@ if __name__ == "__main__":
                     head_file("FR_Test/test_outputs.csv", "output;period")
                     
                     test_outputs_df = transformer_model(test_data, model, "FR_Test/test_outputs.csv")
-                    
-                    # else:
-                    #     test_outputs_df = pd.read_csv("FR_Test/test_outputs.csv", sep=";")
-                    #     test_outputs_df["output"] = test_outputs_df["output"].apply(lambda x: eval(x))
-                    #     test_outputs_df.to_pickle("FR_Test/test_outputs.pickle")
-                    #     print(test_outputs_df)
-                    #     del test_outputs_df
-
-                    
+    
                     # read train_outputs from pickle
                     train_outputs_df = pd.read_pickle("FR_Test/train_outputs.pickle")
 
