@@ -468,101 +468,92 @@ if __name__ == "__main__":
             
                 for lexical_extraction in [True, False]:
 
-                    if not (transformer == "BERT" and chunker_params == ("paragraph", 1) and lexical_extraction):
+                    # initialize vectorizer
+                    vectorizer = TfidfVectorizer() if lexical_extraction else CountVectorizer()
 
-                        # initialize vectorizer
-                        vectorizer = TfidfVectorizer() if lexical_extraction else CountVectorizer()
-
-                        # delete all train_data and profile files
-                        clear_dir("FR_Test/train_data")
-                        clear_dir("FR_Test/profiles")
-                        
-                        # start threads to generate each profile, store threads in processes
-                        processes = []
-                        i=0
-                        for key, value in tqdm(separate_periods(train).items(), desc="Starting Profile Generators"):
-                            process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/train_data/train_data_{i}.csv", tokenizer, chunker_params, vectorizer, i, lexical_extraction))
-                            processes.append(process)
-                            process.start()
-                            i+=1
-                        
-                        # join profile generator threads and add docs to train_data dataframe
-                        train_data = pd.DataFrame(columns=["doc", "mask", "period"])
-                        for index in tqdm(range(len(processes)), desc="Waiting for Profile Generators"):
-                            processes[index].join()
-                            df = pd.read_csv(f"FR_Test/train_data/train_data_{index}.csv", sep=";")
-                            train_data = pd.concat([train_data, df], ignore_index=True)
-                        
-                        del processes
-
-                        # set all docs and masks to the same length
-                        match_lengths("doc", max_input_length, train_data)
-                        match_lengths("mask", max_input_length, train_data)
-                        
-                        # save train_data to a CSV file and serialize as a pickle
-                        train_data.to_csv("FR_Test/train_data.csv", sep=";")
-                        train_data.to_pickle("FR_Test/train_data.pickle")
+                    # delete all train_data and profile files
+                    clear_dir("FR_Test/train_data")
+                    clear_dir("FR_Test/profiles")
                     
+                    # start threads to generate each profile, store threads in processes
+                    processes = []
+                    i=0
+                    for key, value in tqdm(separate_periods(train).items(), desc="Starting Profile Generators"):
+                        process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/train_data/train_data_{i}.csv", tokenizer, chunker_params, vectorizer, i, lexical_extraction))
+                        processes.append(process)
+                        process.start()
+                        i+=1
                     
-                        # shuffle train_data
-                        train_data = train_data.sample(frac=1).reset_index(drop=True)
-
-                        BATCH_SIZE = 128
-                        
-                        # clear train_outputs.csv
-                        head_file("FR_Test/train_outputs.csv", "output;period")
-                        
-                        # pass the train data through the transformer model and save to CSV
-                        train_outputs_df = transformer_model(train_data, model, "FR_Test/train_outputs.csv")
-
-                        # serialize transformer model output
-                        train_outputs_df.to_pickle("FR_Test/train_outputs.pickle")
-
-                        del train_outputs_df
-                        
-                        # start threads to generate each profile, store threads in processes
-                        processes = []
-                        i=0
-                        for key, value in tqdm(separate_periods(test).items(), desc="Starting Profile Generators"):
-                            process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/test_data/test_data_{i}.csv", tokenizer, chunker_params, vectorizer, i, False))
-                            processes.append(process)
-                            process.start()
-                            i+=1
-                        
-                        # join profile generator threads and add docs to test_data dataframe
-                        test_data = pd.DataFrame(columns=["doc", "mask", "period"])
-                        for index in tqdm(range(len(processes)), desc="Waiting for Profile Generators"):
-                            processes[index].join()
-                            df = pd.read_csv(f"FR_Test/test_data/test_data_{index}.csv", sep=";")
-                            test_data = pd.concat([test_data, df], ignore_index=True)
-                        
-                        del processes
-
-                        # set all docs and masks to the same length
-                        match_lengths("doc", max_input_length, test_data)
-                        match_lengths("mask", max_input_length, test_data)
-                        
-                        # save test data to CSV and serialize
-                        test_data.to_csv("FR_Test/test_data.csv", sep=";")
-                        test_data.to_pickle("FR_Test/test_data.pickle")
-                        
-                        # shuffle test_data
-                        test_data = test_data.sample(frac=1).reset_index(drop=True)
-
-                        BATCH_SIZE = 128
-                        
-                        # clear test_outputs.csv
-                        head_file("FR_Test/test_outputs.csv", "output;period")
-                        
-                        test_outputs_df = transformer_model(test_data, model, "FR_Test/test_outputs.csv")
-                        test_outputs_df.to_pickle("FR_Test/test_outputs.pickle")
+                    # join profile generator threads and add docs to train_data dataframe
+                    train_data = pd.DataFrame(columns=["doc", "mask", "period"])
+                    for index in tqdm(range(len(processes)), desc="Waiting for Profile Generators"):
+                        processes[index].join()
+                        df = pd.read_csv(f"FR_Test/train_data/train_data_{index}.csv", sep=";")
+                        train_data = pd.concat([train_data, df], ignore_index=True)
                     
-                    # else:
-                    #     test_outputs_df = pd.read_csv("FR_Test/test_outputs.csv", sep=";")
-                    #     test_outputs_df["output"] = test_outputs_df["output"].apply(lambda x: eval(x))
-                    #     print(test_outputs_df)
-                    #     test_outputs_df.to_pickle("FR_Test/test_outputs.pickle")
-                    #     del test_outputs_df
+                    del processes
+
+                    # set all docs and masks to the same length
+                    match_lengths("doc", max_input_length, train_data)
+                    match_lengths("mask", max_input_length, train_data)
+                    
+                    # save train_data to a CSV file and serialize as a pickle
+                    train_data.to_csv("FR_Test/train_data.csv", sep=";")
+                    train_data.to_pickle("FR_Test/train_data.pickle")
+                
+                
+                    # shuffle train_data
+                    train_data = train_data.sample(frac=1).reset_index(drop=True)
+
+                    BATCH_SIZE = 128
+                    
+                    # clear train_outputs.csv
+                    head_file("FR_Test/train_outputs.csv", "output;period")
+                    
+                    # pass the train data through the transformer model and save to CSV
+                    train_outputs_df = transformer_model(train_data, model, "FR_Test/train_outputs.csv")
+
+                    # serialize transformer model output
+                    train_outputs_df.to_pickle("FR_Test/train_outputs.pickle")
+
+                    del train_outputs_df
+                    
+                    # start threads to generate each profile, store threads in processes
+                    processes = []
+                    i=0
+                    for key, value in tqdm(separate_periods(test).items(), desc="Starting Profile Generators"):
+                        process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/test_data/test_data_{i}.csv", tokenizer, chunker_params, vectorizer, i, False))
+                        processes.append(process)
+                        process.start()
+                        i+=1
+                    
+                    # join profile generator threads and add docs to test_data dataframe
+                    test_data = pd.DataFrame(columns=["doc", "mask", "period"])
+                    for index in tqdm(range(len(processes)), desc="Waiting for Profile Generators"):
+                        processes[index].join()
+                        df = pd.read_csv(f"FR_Test/test_data/test_data_{index}.csv", sep=";")
+                        test_data = pd.concat([test_data, df], ignore_index=True)
+                    
+                    del processes
+
+                    # set all docs and masks to the same length
+                    match_lengths("doc", max_input_length, test_data)
+                    match_lengths("mask", max_input_length, test_data)
+                    
+                    # save test data to CSV and serialize
+                    test_data.to_csv("FR_Test/test_data.csv", sep=";")
+                    test_data.to_pickle("FR_Test/test_data.pickle")
+                    
+                    # shuffle test_data
+                    test_data = test_data.sample(frac=1).reset_index(drop=True)
+
+                    BATCH_SIZE = 128
+                    
+                    # clear test_outputs.csv
+                    head_file("FR_Test/test_outputs.csv", "output;period")
+                    
+                    test_outputs_df = transformer_model(test_data, model, "FR_Test/test_outputs.csv")
+                    test_outputs_df.to_pickle("FR_Test/test_outputs.pickle")
     
                     # read train_outputs from pickle
                     train_outputs_df = pd.read_pickle("FR_Test/train_outputs.pickle")
