@@ -348,6 +348,9 @@ def get_accuracy(estimate : int,
     if expected-PERIOD_LENGTH <= estimate <= expected+PERIOD_LENGTH: acc_3 = 1
     if expected-2*PERIOD_LENGTH <= estimate <= expected+2*PERIOD_LENGTH: acc_5 = 1
     
+    with open("FR_Test/confusion.csv", "a") as file:
+        file.write(f"{estimate};{expected}")
+
     return acc, acc_3, acc_5
 
 
@@ -437,8 +440,10 @@ if __name__ == "__main__":
     # split docs into train and test data
     train, test = train_test_split(data_df, train_size=0.8)
 
-    # clear and head results file
-    head_file("FR_Test/results.csv", "transformer;chunker_params;model;acc;acc@3;acc@5")
+    # # clear and head results file
+    # head_file("FR_Test/results.csv", "transformer;chunker_params;model;acc;acc@3;acc@5")
+
+    completed_tests = []
 
     # list chunker parameter combinations
     chunker_params_list = [("paragraph", 1), ("sentence", 3), ("word", 100), ("word", 200), ("sentence", 5), ("paragraph", 2)]
@@ -468,152 +473,153 @@ if __name__ == "__main__":
             
                 for lexical_extraction in [True, False]:
 
-                    # initialize vectorizer
-                    vectorizer = TfidfVectorizer() if lexical_extraction else CountVectorizer()
+                    if not (transformer, chunker_params, lexical_extraction) in completed_tests:
 
-                    # delete all train_data and profile files
-                    clear_dir("FR_Test/train_data")
-                    clear_dir("FR_Test/profiles")
-                    
-                    # start threads to generate each profile, store threads in processes
-                    processes = []
-                    i=0
-                    for key, value in tqdm(separate_periods(train).items(), desc="Starting Profile Generators"):
-                        process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/train_data/train_data_{i}.csv", tokenizer, chunker_params, vectorizer, i, lexical_extraction))
-                        processes.append(process)
-                        process.start()
-                        i+=1
-                    
-                    # join profile generator threads and add docs to train_data dataframe
-                    train_data = pd.DataFrame(columns=["doc", "mask", "period"])
-                    for index in tqdm(range(len(processes)), desc="Waiting for Profile Generators"):
-                        processes[index].join()
-                        df = pd.read_csv(f"FR_Test/train_data/train_data_{index}.csv", sep=";")
-                        train_data = pd.concat([train_data, df], ignore_index=True)
-                    
-                    del processes
+                        # initialize vectorizer
+                        vectorizer = TfidfVectorizer() if lexical_extraction else CountVectorizer()
 
-                    # set all docs and masks to the same length
-                    match_lengths("doc", max_input_length, train_data)
-                    match_lengths("mask", max_input_length, train_data)
-                    
-                    # save train_data to a CSV file and serialize as a pickle
-                    train_data.to_csv("FR_Test/train_data.csv", sep=";")
-                    train_data.to_pickle("FR_Test/train_data.pickle")
-                
-                
-                    # shuffle train_data
-                    train_data = train_data.sample(frac=1).reset_index(drop=True)
+                        # delete all train_data and profile files
+                        clear_dir("FR_Test/train_data")
+                        clear_dir("FR_Test/profiles")
+                        
+                        # start threads to generate each profile, store threads in processes
+                        processes = []
+                        i=0
+                        for key, value in tqdm(separate_periods(train).items(), desc="Starting Profile Generators"):
+                            process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/train_data/train_data_{i}.csv", tokenizer, chunker_params, vectorizer, i, lexical_extraction))
+                            processes.append(process)
+                            process.start()
+                            i+=1
+                        
+                        # join profile generator threads and add docs to train_data dataframe
+                        train_data = pd.DataFrame(columns=["doc", "mask", "period"])
+                        for index in tqdm(range(len(processes)), desc="Waiting for Profile Generators"):
+                            processes[index].join()
+                            df = pd.read_csv(f"FR_Test/train_data/train_data_{index}.csv", sep=";")
+                            train_data = pd.concat([train_data, df], ignore_index=True)
+                        
+                        del processes
 
-                    BATCH_SIZE = 128
+                        # set all docs and masks to the same length
+                        match_lengths("doc", max_input_length, train_data)
+                        match_lengths("mask", max_input_length, train_data)
+                        
+                        # save train_data to a CSV file and serialize as a pickle
+                        train_data.to_csv("FR_Test/train_data.csv", sep=";")
+                        train_data.to_pickle("FR_Test/train_data.pickle")
                     
-                    # clear train_outputs.csv
-                    head_file("FR_Test/train_outputs.csv", "output;period")
                     
-                    # pass the train data through the transformer model and save to CSV
-                    train_outputs_df = transformer_model(train_data, model, "FR_Test/train_outputs.csv")
+                        # shuffle train_data
+                        train_data = train_data.sample(frac=1).reset_index(drop=True)
 
-                    # serialize transformer model output
-                    train_outputs_df.to_pickle("FR_Test/train_outputs.pickle")
+                        BATCH_SIZE = 512
+                        
+                        # clear train_outputs.csv
+                        head_file("FR_Test/train_outputs.csv", "output;period")
+                        
+                        # pass the train data through the transformer model and save to CSV
+                        train_outputs_df = transformer_model(train_data, model, "FR_Test/train_outputs.csv")
 
-                    del train_outputs_df
-                    
-                    # start threads to generate each profile, store threads in processes
-                    processes = []
-                    i=0
-                    for key, value in tqdm(separate_periods(test).items(), desc="Starting Profile Generators"):
-                        process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/test_data/test_data_{i}.csv", tokenizer, chunker_params, vectorizer, i, False))
-                        processes.append(process)
-                        process.start()
-                        i+=1
-                    
-                    # join profile generator threads and add docs to test_data dataframe
-                    test_data = pd.DataFrame(columns=["doc", "mask", "period"])
-                    for index in tqdm(range(len(processes)), desc="Waiting for Profile Generators"):
-                        processes[index].join()
-                        df = pd.read_csv(f"FR_Test/test_data/test_data_{index}.csv", sep=";")
-                        test_data = pd.concat([test_data, df], ignore_index=True)
-                    
-                    del processes
+                        # serialize transformer model output
+                        train_outputs_df.to_pickle("FR_Test/train_outputs.pickle")
 
-                    # set all docs and masks to the same length
-                    match_lengths("doc", max_input_length, test_data)
-                    match_lengths("mask", max_input_length, test_data)
-                    
-                    # save test data to CSV and serialize
-                    test_data.to_csv("FR_Test/test_data.csv", sep=";")
-                    test_data.to_pickle("FR_Test/test_data.pickle")
-                    
-                    # shuffle test_data
-                    test_data = test_data.sample(frac=1).reset_index(drop=True)
+                        del train_outputs_df
+                        
+                        # start threads to generate each profile, store threads in processes
+                        processes = []
+                        i=0
+                        for key, value in tqdm(separate_periods(test).items(), desc="Starting Profile Generators"):
+                            process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/test_data/test_data_{i}.csv", tokenizer, chunker_params, vectorizer, i, False))
+                            processes.append(process)
+                            process.start()
+                            i+=1
+                        
+                        # join profile generator threads and add docs to test_data dataframe
+                        test_data = pd.DataFrame(columns=["doc", "mask", "period"])
+                        for index in tqdm(range(len(processes)), desc="Waiting for Profile Generators"):
+                            processes[index].join()
+                            df = pd.read_csv(f"FR_Test/test_data/test_data_{index}.csv", sep=";")
+                            test_data = pd.concat([test_data, df], ignore_index=True)
+                        
+                        del processes
 
-                    BATCH_SIZE = 128
-                    
-                    # clear test_outputs.csv
-                    head_file("FR_Test/test_outputs.csv", "output;period")
-                    
-                    test_outputs_df = transformer_model(test_data, model, "FR_Test/test_outputs.csv")
-                    test_outputs_df.to_pickle("FR_Test/test_outputs.pickle")
-    
-                    # read train_outputs from pickle
-                    train_outputs_df = pd.read_pickle("FR_Test/train_outputs.pickle")
+                        # set all docs and masks to the same length
+                        match_lengths("doc", max_input_length, test_data)
+                        match_lengths("mask", max_input_length, test_data)
+                        
+                        # shuffle test_data
+                        test_data = test_data.sample(frac=1).reset_index(drop=True)
 
-                    # initialize SVM
-                    svm = LinearSVC(max_iter=10000000)
-                    
-                    # train the SVM om the training outputs
-                    svm_start_time = time.time()
-                    print("Training SVM... ", end="")
-                    svm.fit(np.array(train_outputs_df["output"].values.tolist()), np.array(train_outputs_df["period"].values.tolist()))
-                    print("DONE! (" + time.strftime("%H:%M:%S", time.gmtime(time.time()-svm_start_time)) + ")")    
+                        # save test data to CSV and serialize
+                        test_data.to_csv("FR_Test/test_data.csv", sep=";")
+                        test_data.to_pickle("FR_Test/test_data.pickle")
+                        
+                        # clear test_outputs.csv
+                        head_file("FR_Test/test_outputs.csv", "output;period")
+                        
+                        test_outputs_df = transformer_model(test_data, model, "FR_Test/test_outputs.csv")
+                        test_outputs_df.to_pickle("FR_Test/test_outputs.pickle")
+        
+                        # read train_outputs from pickle
+                        train_outputs_df = pd.read_pickle("FR_Test/train_outputs.pickle")
 
-                    del train_outputs_df
+                        # initialize SVM
+                        svm = LinearSVC(max_iter=10000000)
+                        
+                        # train the SVM om the training outputs
+                        svm_start_time = time.time()
+                        print("Training SVM... ", end="")
+                        svm.fit(np.array(train_outputs_df["output"].values.tolist()), np.array(train_outputs_df["period"].values.tolist()))
+                        print("DONE! (" + time.strftime("%H:%M:%S", time.gmtime(time.time()-svm_start_time)) + ")")    
 
-                    test_outputs_df = pd.read_pickle("FR_Test/test_outputs.pickle")
-                    
-                    # get estimates of the year of each test document from the SVM
-                    svm_start_time = time.time()
-                    print("Generating Estimates... ", end="")
-                    estimates = svm.predict(test_outputs_df["output"].tolist())
-                    print("DONE! (" + time.strftime("%H:%M:%S", time.gmtime(time.time()-svm_start_time)) + ")")    
-                    
-                    # assess the accuracy of the model using Acc, Acc@3, and Acc@5
-                    expected_years = test_outputs_df.loc[:, "period"].values.tolist()
+                        del train_outputs_df
 
-                    del test_outputs_df
+                        test_outputs_df = pd.read_pickle("FR_Test/test_outputs.pickle")
+                        
+                        # get estimates of the year of each test document from the SVM
+                        svm_start_time = time.time()
+                        print("Generating Estimates... ", end="")
+                        estimates = svm.predict(test_outputs_df["output"].tolist())
+                        print("DONE! (" + time.strftime("%H:%M:%S", time.gmtime(time.time()-svm_start_time)) + ")")    
+                        
+                        # assess the accuracy of the model using Acc, Acc@3, and Acc@5
+                        expected_years = test_outputs_df.loc[:, "period"].values.tolist()
 
-                    acc_data, acc_3_data, acc_5_data = ([],[],[])
-                    for i in tqdm(range(len(estimates)), desc="Evaluating Accuracy"):
-                        estimate = estimates.item(i)
-                        expected = expected_years[i]
-                        accs = get_accuracy(estimate, expected)
-                        acc_data.append(accs[0])
-                        acc_3_data.append(accs[1])
-                        acc_5_data.append(accs[2])
-                    
-                    # identify the mean accuracy of the model for each metric
-                    acc = np.mean(acc_data)
-                    acc_3 = np.mean(acc_3_data)
-                    acc_5 = np.mean(acc_5_data)
-                    
-                    # print results
-                    print("Acc:", acc)
-                    print("Acc@3:", acc_3)
-                    print("Acc@5:", acc_5)
-                    
-                    # add results to results.csv
-                    result_line = transformer + ";" + str(chunker_params) + ";"
-                    result_line += "LE" if lexical_extraction else "BASE"
-                    match lexical_extraction:
-                        case TfidfVectorizer():
-                            result_line += "tf-idf"
-                        case CountVectorizer():
-                            result_line += "count"
-                    result_line += ";" + str(acc) + ";" + str(acc_3) + ";" + str(acc_5)
-                    with open("FR_Test/results.csv", "a") as results_file:
-                        results_file.write("\n" + result_line)
+                        del test_outputs_df
+                        
+                        head_file("FR_Test/confusion.csv", "estimate;expected")
+                        acc_data, acc_3_data, acc_5_data = ([],[],[])
+                        for i in tqdm(range(len(estimates)), desc="Evaluating Accuracy"):
+                            estimate = estimates.item(i)
+                            expected = expected_years[i]
+                            accs = get_accuracy(estimate, expected)
+                            acc_data.append(accs[0])
+                            acc_3_data.append(accs[1])
+                            acc_5_data.append(accs[2])
+                        
+                        # identify the mean accuracy of the model for each metric
+                        acc = np.mean(acc_data)
+                        acc_3 = np.mean(acc_3_data)
+                        acc_5 = np.mean(acc_5_data)
+                        
+                        # print results
+                        print("Acc:", acc)
+                        print("Acc@3:", acc_3)
+                        print("Acc@5:", acc_5)
+                        
+                        # add results to results.csv
+                        result_line = transformer + ";" + str(chunker_params) + ";"
+                        result_line += "LE" if lexical_extraction else "BASE"
+                        match lexical_extraction:
+                            case TfidfVectorizer():
+                                result_line += "tf-idf"
+                            case CountVectorizer():
+                                result_line += "count"
+                        result_line += ";" + str(acc) + ";" + str(acc_3) + ";" + str(acc_5)
+                        with open("FR_Test/results.csv", "a") as results_file:
+                            results_file.write("\n" + result_line)
 
-                    # print overall test results
-                    print("===============================================")
-                    print(pd.read_csv("FR_Test/results.csv", sep=";"))
-                    print("===============================================")
+                        # print overall test results
+                        print("============================================================================")
+                        print(pd.read_csv("FR_Test/results.csv", sep=";"))
+                        print("============================================================================")
