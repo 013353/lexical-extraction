@@ -349,7 +349,7 @@ def get_accuracy(estimate : int,
     if expected-2*PERIOD_LENGTH <= estimate <= expected+2*PERIOD_LENGTH: acc_5 = 1
     
     with open("FR_Test/confusion.csv", "a") as file:
-        file.write(f"{estimate};{expected}")
+        file.write(f"\n{estimate};{expected}")
 
     return acc, acc_3, acc_5
 
@@ -443,7 +443,7 @@ if __name__ == "__main__":
     # # clear and head results file
     # head_file("FR_Test/results.csv", "transformer;chunker_params;model;acc;acc@3;acc@5")
 
-    completed_tests = []
+    completed_tests = [("BERT", ("paragraph", 1), True)]
 
     # list chunker parameter combinations
     chunker_params_list = [("paragraph", 1), ("sentence", 3), ("word", 100), ("word", 200), ("sentence", 5), ("paragraph", 2)]
@@ -473,7 +473,11 @@ if __name__ == "__main__":
             
                 for lexical_extraction in [True, False]:
 
+                    name = transformer[0] + chunker_params[0][0].upper() + str(chunker_params[1]) + ("T" if lexical_extraction else "F")
+
                     if not (transformer, chunker_params, lexical_extraction) in completed_tests:
+
+                        print("Name:", name)
 
                         # initialize vectorizer
                         vectorizer = TfidfVectorizer() if lexical_extraction else CountVectorizer()
