@@ -1,3 +1,11 @@
+def csv_to_pickle(csv_file: str, sep=";", pickle_file=None):
+    import pandas as pd
+    if not pickle_file:
+        pickle_file = csv_file[:-3] + "pickle"
+        print(pickle_file)
+    
+    pd.read_csv(csv_file, sep=sep).to_pickle(pickle_file)
+
 def visualize_profiles(model):
     import os
     from tqdm import tqdm
@@ -17,9 +25,6 @@ def visualize_profiles(model):
         profiles.append(profile)
         print(profile)
         profile.to_csv("temp_data.csv")
-    
-    # for profile in profiles:
-    #     print(profile)
 
 def visualize_output(file: str):
     import numpy as np
@@ -58,5 +63,23 @@ def visualize_output(file: str):
     plt.savefig("output.png")
     plt.show()
 
+def confusion_matrix(file: str):
+    import pandas as pd
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    from tqdm import tqdm
+    data = pd.read_pickle(file)
+    data.sort_values(by=["estimate", "expected"], ignore_index=True, inplace=True)
+    matrix = pd.DataFrame(0, columns=sorted(list(set(data["expected"].tolist()))), index=sorted(list(set(data["expected"].tolist()))))
+    
+    for i, row in tqdm(data.iterrows(), total=len(data.index)):
+        matrix.loc[row["expected"], row["estimate"]] += 1
+    
+    print(matrix)
+        
+    sns.heatmap(matrix, cmap="viridis")
+    plt.show()
+
 if __name__ == "__main__":
-    visualize_output("FR_Test/train_outputs.csv")
+    csv_to_pickle("confusion_BP1F.csv")
+    confusion_matrix("confusion_BP1F.pickle")
