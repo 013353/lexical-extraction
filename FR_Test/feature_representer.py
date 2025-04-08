@@ -1,5 +1,5 @@
 if __name__ == "__main__":
-    print("Importing packages... ")
+    print("Importing packages... ", end="", flush=True)
 
 completed = False
 while not completed:
@@ -351,7 +351,7 @@ def get_accuracy(estimate : int,
     
     """
     
-    acc = acc_3 = acc_5 = 0
+    acc, acc_3, acc_5 = (0, 0, 0)
     if estimate == expected: acc = 1
     if expected-PERIOD_LENGTH <= estimate <= expected+PERIOD_LENGTH: acc_3 = 1
     if expected-2*PERIOD_LENGTH <= estimate <= expected+2*PERIOD_LENGTH: acc_5 = 1
@@ -437,7 +437,7 @@ def transformer_model(data : pd.DataFrame,
 
 
 if __name__ == "__main__":
-    print("\rDONE!")
+    print("DONE!")
 
     # retrieve doc data from file
     data_df = pd.read_csv("Documents/_doc_data.csv")
@@ -452,35 +452,36 @@ if __name__ == "__main__":
     # # clear and head results file
     # head_file("FR_Test/results.csv", "transformer;chunker_params;model;acc;acc@3;acc@5")
 
-    completed_tests = []
+    completed_tests = ["BP1F", "BP1T"]
 
     # list chunker parameter combinations
     chunker_params_list = [("paragraph", 1), ("sentence", 3), ("word", 100), ("word", 200), ("sentence", 5), ("paragraph", 2)]
 
-    transformers = ["BERT", "RoBERTa", "Longformer"]    
-    for transformer in transformers:
-        
-        # disables gradient calculation, saving GPU memory
-        with torch.no_grad():
+    transformers = ["BERT", "RoBERTa", "Longformer"]
+    
+    for chunker_params in chunker_params_list:
+            
+        for transformer in transformers:
+            
+            # disables gradient calculation, saving GPU memory
+            with torch.no_grad():
 
-            # initialize tokenizers and models
-            match transformer:
-                case "BERT":
-                    tokenizer = BertTokenizerFast.from_pretrained("google-bert/bert-base-uncased")
-                    model = BertModel.from_pretrained("google-bert/bert-base-uncased").to(dev)
-                    max_input_length = 512
-                case "RoBERTa":
-                    tokenizer = RobertaTokenizerFast.from_pretrained("FacebookAI/roberta-base")
-                    model = RobertaModel.from_pretrained("FacebookAI/roberta-base").to(dev)
-                    max_input_length = 512
-                case "Longformer":
-                    tokenizer = LongformerTokenizerFast.from_pretrained("allenai/longformer-base-4096")
-                    model = LongformerModel.from_pretrained("allenai/longformer-base-4096").to(dev)
-                    max_input_length = 1024
+                # initialize tokenizers and models
+                match transformer:
+                    case "BERT":
+                        tokenizer = BertTokenizerFast.from_pretrained("google-bert/bert-base-uncased")
+                        model = BertModel.from_pretrained("google-bert/bert-base-uncased").to(dev)
+                        max_input_length = 512
+                    case "RoBERTa":
+                        tokenizer = RobertaTokenizerFast.from_pretrained("FacebookAI/roberta-base")
+                        model = RobertaModel.from_pretrained("FacebookAI/roberta-base").to(dev)
+                        max_input_length = 512
+                    case "Longformer":
+                        tokenizer = LongformerTokenizerFast.from_pretrained("allenai/longformer-base-4096")
+                        model = LongformerModel.from_pretrained("allenai/longformer-base-4096").to(dev)
+                        max_input_length = 1024
             
-            for chunker_params in chunker_params_list:
-            
-                for lexical_extraction in [True, False]:
+                for lexical_extraction in [False, True]:
 
                     name = transformer[0] + chunker_params[0][0].upper() + str(chunker_params[1])[0] + ("T" if lexical_extraction else "F")
 
@@ -523,17 +524,18 @@ if __name__ == "__main__":
                         train_data.to_csv(f"FR_Test/{name}/train_data.csv", sep=";")
                         train_data.to_pickle(f"FR_Test/{name}/train_data.pickle")
                     
-                    
                         # shuffle train_data
                         train_data = train_data.sample(frac=1).reset_index(drop=True)
 
-                        BATCH_SIZE = 512
+                        BATCH_SIZE = 128
                         
                         # clear train_outputs.csv
                         head_file(f"FR_Test/{name}/train_outputs.csv", "output;period")
                         
                         # pass the train data through the transformer model and save to CSV
                         train_outputs_df = transformer_model(train_data, model, f"FR_Test/{name}/train_outputs.csv", name)
+                        
+                        del train_data
 
                         # serialize transformer model output
                         train_outputs_df.to_pickle(f"FR_Test/{name}/train_outputs.pickle")
@@ -575,7 +577,12 @@ if __name__ == "__main__":
                         head_file(f"FR_Test/{name}/test_outputs.csv", "output;period")
                         
                         test_outputs_df = transformer_model(test_data, model, f"FR_Test/{name}/test_outputs.csv", name)
+                        
+                        del test_data
+                        
                         test_outputs_df.to_pickle(f"FR_Test/{name}/test_outputs.pickle")
+                        
+                        del test_outputs_df
         
                         # read train_outputs from pickle
                         train_outputs_df = pd.read_pickle(f"FR_Test/{name}/train_outputs.pickle")
@@ -585,7 +592,7 @@ if __name__ == "__main__":
                         
                         # train the SVM om the training outputs
                         svm_start_time = time.time()
-                        print("Training SVM... ", end="")
+                        print("Training SVM... ", end="", flush=True)
                         svm.fit(np.array(train_outputs_df["output"].values.tolist()), np.array(train_outputs_df["period"].values.tolist()))
                         print("DONE! (" + time.strftime("%H:%M:%S", time.gmtime(time.time()-svm_start_time)) + ")")    
 
@@ -595,7 +602,7 @@ if __name__ == "__main__":
                         
                         # get estimates of the year of each test document from the SVM
                         svm_start_time = time.time()
-                        print("Generating Estimates... ", end="")
+                        print("Generating Estimates... ", end="", flush=True)
                         estimates = svm.predict(test_outputs_df["output"].tolist())
                         print("DONE! (" + time.strftime("%H:%M:%S", time.gmtime(time.time()-svm_start_time)) + ")")    
                         
