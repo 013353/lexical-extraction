@@ -69,6 +69,7 @@ def confusion_matrix(file: str):
     import matplotlib.pyplot as plt
     from tqdm import tqdm
     data = pd.read_pickle(file)
+    print(data)
     data.sort_values(by=["estimate", "expected"], ignore_index=True, inplace=True)
     matrix = pd.DataFrame(0, columns=sorted(list(set(data["expected"].tolist()))), index=sorted(list(set(data["expected"].tolist()))))
     
@@ -81,5 +82,6 @@ def confusion_matrix(file: str):
     plt.show()
 
 if __name__ == "__main__":
-    csv_to_pickle("confusion_BP1F.csv")
-    confusion_matrix("confusion_BP1F.pickle")
+    foo = "BP1F"
+    csv_to_pickle(f"FR_Test/{foo}/confusion.csv")
+    confusion_matrix(f"FR_Test/{foo}/confusion.pickle")
