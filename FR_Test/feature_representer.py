@@ -593,11 +593,50 @@ if __name__ == "__main__":
                         # train the SVM om the training outputs
                         svm_start_time = time.time()
                         print("Training SVM... ", end="", flush=True)
-                        svm.fit(np.array(train_outputs_df["output"].values.tolist()), np.array(train_outputs_df["period"].values.tolist()))
+                        clf = svm.fit(np.array(train_outputs_df["output"].values.tolist()), np.array(train_outputs_df["period"].values.tolist()))
                         print("DONE! (" + time.strftime("%H:%M:%S", time.gmtime(time.time()-svm_start_time)) + ")")    
+                        
+                        import numpy as np
+                        import matplotlib.pyplot as plt
+                        from sklearn.decomposition import PCA
 
+                        X = train_outputs_df["output"].values.tolist()
+                        y = train_outputs_df["period"].values.tolist()
+
+                        pca = PCA(n_components=2)
+                        Xreduced = pca.fit_transform()
+
+                        def make_meshgrid(x, y, h=.02):
+                            x_min, x_max = x.min() - 1, x.max() + 1
+                            y_min, y_max = y.min() - 1, y.max() + 1
+                            xx, yy = np.meshgrid(np.arange(x_min, x_max, h), np.arange(y_min, y_max, h))
+                            return xx, yy
+
+                        def plot_contours(ax, clf, xx, yy, **params):
+                            Z = clf.predict(np.c_[xx.ravel(), yy.ravel()])
+                            Z = Z.reshape(xx.shape)
+                            out = ax.contourf(xx, yy, Z, **params)
+                            return out
+
+                        fig, ax = plt.subplots()
+                        # title for the plots
+                        title = ('Decision surface of linear SVC ')
+                        # Set-up grid for plotting.
+                        X0, X1 = Xreduced[:, 0], Xreduced[:, 1]
+                        xx, yy = make_meshgrid(X0, X1)
+
+                        plot_contours(ax, clf, xx, yy, cmap=plt.cm.coolwarm, alpha=0.8)
+                        ax.scatter(X0, X1, c=y, cmap=plt.cm.coolwarm, s=20, edgecolors='k')
+                        ax.set_ylabel('PC2')
+                        ax.set_xlabel('PC1')
+                        ax.set_xticks(())
+                        ax.set_yticks(())
+                        ax.set_title('Decison surface using the PCA transformed/projected features')
+                        ax.legend()
+                        plt.show()
+                        
                         del train_outputs_df
-
+                        
                         test_outputs_df = pd.read_pickle(f"FR_Test/{name}/test_outputs.pickle")
                         
                         # get estimates of the year of each test document from the SVM
