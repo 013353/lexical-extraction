@@ -165,7 +165,7 @@ def generate_profile(corpus : list,
     middle_weights = middle_weights[middle_weights["weight"] > bottom]
     
     # identify the ids in the selected range, save to file, return
-    middle_ids = list(middle_weights.index)
+    middle_ids = list(map(int, middle_weights.index))
     sorted_weights_df.to_csv(f"FR_Test/{name}/profiles/{num}.csv")
     
     return middle_ids
@@ -207,6 +207,7 @@ def add_inputs_to_file(period : int,
     if generate_profile_and_mask:
         # generate profile and append it to file
         profile = generate_profile(tokenized_period, vectorizer, num, name)
+        # profile = pd.read_csv(f"FR_Test/BP1T/profiles/{num}.csv")
         with open(filepath, "a") as file:
             for doc in tokenized_period:
                 mask = []
@@ -452,7 +453,7 @@ if __name__ == "__main__":
     # # clear and head results file
     # head_file("FR_Test/results.csv", "transformer;chunker_params;model;acc;acc@3;acc@5")
 
-    completed_tests = ["BP1F", "BP1T"]
+    completed_tests = ["BP1F"]
 
     # list chunker parameter combinations
     chunker_params_list = [("paragraph", 1), ("sentence", 3), ("word", 100), ("word", 200), ("sentence", 5), ("paragraph", 2)]
@@ -588,52 +589,57 @@ if __name__ == "__main__":
                         train_outputs_df = pd.read_pickle(f"FR_Test/{name}/train_outputs.pickle")
 
                         # initialize SVM
-                        svm = LinearSVC(max_iter=10000000)
+                        svm = LinearSVC(max_iter=1000000000)
                         
                         # train the SVM om the training outputs
                         svm_start_time = time.time()
                         print("Training SVM... ", end="", flush=True)
-                        clf = svm.fit(np.array(train_outputs_df["output"].values.tolist()), np.array(train_outputs_df["period"].values.tolist()))
+                        svm.fit(np.array(train_outputs_df["output"].values.tolist()), np.array(train_outputs_df["period"].values.tolist()))
                         print("DONE! (" + time.strftime("%H:%M:%S", time.gmtime(time.time()-svm_start_time)) + ")")    
                         
-                        import numpy as np
-                        import matplotlib.pyplot as plt
-                        from sklearn.decomposition import PCA
+                        # import numpy as np
+                        # import matplotlib.pyplot as plt
+                        # from sklearn.decomposition import PCA
 
-                        X = train_outputs_df["output"].values.tolist()
-                        y = train_outputs_df["period"].values.tolist()
+                        # X = train_outputs_df["output"].values.tolist()
+                        # y = train_outputs_df["period"].values.tolist()
 
-                        pca = PCA(n_components=2)
-                        Xreduced = pca.fit_transform()
+                        # pca = PCA(n_components=2)
+                        # Xreduced = pca.fit_transform(X)
 
-                        def make_meshgrid(x, y, h=.02):
-                            x_min, x_max = x.min() - 1, x.max() + 1
-                            y_min, y_max = y.min() - 1, y.max() + 1
-                            xx, yy = np.meshgrid(np.arange(x_min, x_max, h), np.arange(y_min, y_max, h))
-                            return xx, yy
+                        # def make_meshgrid(x, y, h=.02):
+                        #     x_min, x_max = x.min() - 1, x.max() + 1
+                        #     y_min, y_max = y.min() - 1, y.max() + 1
+                        #     xx, yy = np.meshgrid(np.arange(x_min, x_max, h), np.arange(y_min, y_max, h))
+                        #     return xx, yy
 
-                        def plot_contours(ax, clf, xx, yy, **params):
-                            Z = clf.predict(np.c_[xx.ravel(), yy.ravel()])
-                            Z = Z.reshape(xx.shape)
-                            out = ax.contourf(xx, yy, Z, **params)
-                            return out
+                        # def plot_contours(ax, clf, xx, yy, **params):
+                        #     Z = clf.predict(np.c_[xx.ravel(), yy.ravel()])
+                        #     Z = Z.reshape(xx.shape)
+                        #     out = ax.contourf(xx, yy, Z, **params)
+                        #     return out
 
-                        fig, ax = plt.subplots()
-                        # title for the plots
-                        title = ('Decision surface of linear SVC ')
-                        # Set-up grid for plotting.
-                        X0, X1 = Xreduced[:, 0], Xreduced[:, 1]
-                        xx, yy = make_meshgrid(X0, X1)
+                        # model = LinearSVC(max_iter=1000000000)
+                        # clf = model.fit(Xreduced, y)
 
-                        plot_contours(ax, clf, xx, yy, cmap=plt.cm.coolwarm, alpha=0.8)
-                        ax.scatter(X0, X1, c=y, cmap=plt.cm.coolwarm, s=20, edgecolors='k')
-                        ax.set_ylabel('PC2')
-                        ax.set_xlabel('PC1')
-                        ax.set_xticks(())
-                        ax.set_yticks(())
-                        ax.set_title('Decison surface using the PCA transformed/projected features')
-                        ax.legend()
-                        plt.show()
+                        # fig, ax = plt.subplots()
+                        # # title for the plots
+                        # title = ('Decision surface of linear SVC ')
+                        # # Set-up grid for plotting.
+                        # X0, X1 = Xreduced[:, 0], Xreduced[:, 1]
+                        # xx, yy = make_meshgrid(X0, X1)
+
+                        # print(train_outputs_df)
+
+                        # plot_contours(ax, clf, xx, yy, cmap=plt.cm.coolwarm, alpha=0.8)
+                        # ax.scatter(X0, X1, c=y, cmap=plt.cm.coolwarm, s=20, edgecolors='k')
+                        # ax.set_ylabel('PC2')
+                        # ax.set_xlabel('PC1')
+                        # ax.set_xticks(())
+                        # ax.set_yticks(())
+                        # ax.set_title('Decison surface using the PCA transformed/projected features')
+                        # ax.legend()
+                        # plt.show()
                         
                         del train_outputs_df
                         
