@@ -69,19 +69,34 @@ def confusion_matrix(file: str):
     import matplotlib.pyplot as plt
     from tqdm import tqdm
     data = pd.read_pickle(file)
-    print(data)
+    num_tests = len(data.index)
     data.sort_values(by=["estimate", "expected"], ignore_index=True, inplace=True)
     matrix = pd.DataFrame(0, columns=sorted(list(set(data["expected"].tolist()))), index=sorted(list(set(data["expected"].tolist()))))
     
     for i, row in tqdm(data.iterrows(), total=len(data.index)):
         matrix.loc[row["expected"], row["estimate"]] += 1
     
+    def to_ratio(freq: int) -> float:
+        return round((freq / num_tests), 3)
+    
+    matrix = matrix.map(to_ratio)
+    
     print(matrix)
-        
-    sns.heatmap(matrix, cmap="viridis")
+    
+    fig = plt.figure(figsize=(12, 9))
+    # sns.set_theme(
+    #     font_scale=0.5,
+    #     )
+    
+    ax = sns.heatmap(matrix, cmap="viridis", annot=True, square=True, annot_kws={"fontsize": 6}, cbar_kws={"label": "Ratio of Total Tests"})
+    # ax.set(xlabel="Estimated Time Periods", ylabel="Actual Time Periods")
+    ax.set_xlabel("Predicted Time Periods", fontsize=10)
+    ax.set_ylabel("Actual Time Periods", fontsize=10)
+    ax.set_title("Confusion Matrix of BP1T Model", fontsize=20)
+    plt.savefig("BP1T_cmatrix.png", dpi=600)
     plt.show()
 
 if __name__ == "__main__":
-    foo = "BP1F"
+    foo = "BP1T"
     csv_to_pickle(f"FR_Test/{foo}/confusion.csv")
     confusion_matrix(f"FR_Test/{foo}/confusion.pickle")
