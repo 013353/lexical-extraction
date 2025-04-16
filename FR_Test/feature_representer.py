@@ -157,19 +157,18 @@ def generate_profile(corpus : list,
     sorted_weights_df = sorted_weights_df.sort_values(by=sorted_weights_df.columns[0], axis=0, ascending=False)
     
     # identify the upper and lower quantile boundaries
-    bottom = sorted_weights_df.quantile(0.125)["weight"]
-    top = sorted_weights_df.quantile(0.875)["weight"]
+    bottom = sorted_weights_df.quantile(0.25)["weight"]
+    # top = sorted_weights_df.quantile(0.875)["weight"]
     
     # remove weights outside the selected quantile range
-    middle_weights = sorted_weights_df[sorted_weights_df["weight"] < top]
-    middle_weights = middle_weights[middle_weights["weight"] > bottom]
+    # middle_weights = sorted_weights_df[sorted_weights_df["weight"] < top]
+    middle_weights = sorted_weights_df[sorted_weights_df["weight"] > bottom]
     
     # identify the ids in the selected range, save to file, return
     middle_ids = list(map(int, middle_weights.index))
     sorted_weights_df.to_csv(f"FR_Test/{name}/profiles/{num}.csv")
     
     return middle_ids
-
 
 def add_inputs_to_file(period : int,
                        docs : any,
@@ -221,7 +220,6 @@ def add_inputs_to_file(period : int,
                 mask = [1]*len(doc)
                 file.write(f"\n{doc};{mask};{period}")
 
-    
 def tokenize(dataset : any, 
              mode : str, 
              size : int, 
@@ -273,7 +271,6 @@ def tokenize(dataset : any,
         tokenized_chunks.append(tokenized_chunk)
 
     return tokenized_chunks
-
 
 def separate_periods(df : pd.DataFrame
                      ) -> dict[int, pd.DataFrame]:
@@ -361,7 +358,6 @@ def get_accuracy(estimate : int,
         file.write(f"\n{estimate};{expected}")
 
     return acc, acc_3, acc_5
-
 
 def match_lengths(col : str, 
                   length : int,
@@ -453,7 +449,7 @@ if __name__ == "__main__":
     # # clear and head results file
     # head_file("FR_Test/results.csv", "transformer;chunker_params;model;acc;acc@3;acc@5")
 
-    completed_tests = ["BP1F"]
+    completed_tests = []
 
     # list chunker parameter combinations
     chunker_params_list = [("paragraph", 1), ("sentence", 3), ("word", 100), ("word", 200), ("sentence", 5), ("paragraph", 2)]
@@ -482,7 +478,7 @@ if __name__ == "__main__":
                         model = LongformerModel.from_pretrained("allenai/longformer-base-4096").to(dev)
                         max_input_length = 1024
             
-                for lexical_extraction in [False, True]:
+                for lexical_extraction in [True, False]:
 
                     name = transformer[0] + chunker_params[0][0].upper() + str(chunker_params[1])[0] + ("T" if lexical_extraction else "F")
 
@@ -589,57 +585,13 @@ if __name__ == "__main__":
                         train_outputs_df = pd.read_pickle(f"FR_Test/{name}/train_outputs.pickle")
 
                         # initialize SVM
-                        svm = LinearSVC(max_iter=1000000000)
+                        svm = LinearSVC(max_iter=100000000)
                         
                         # train the SVM om the training outputs
                         svm_start_time = time.time()
                         print("Training SVM... ", end="", flush=True)
                         svm.fit(np.array(train_outputs_df["output"].values.tolist()), np.array(train_outputs_df["period"].values.tolist()))
                         print("DONE! (" + time.strftime("%H:%M:%S", time.gmtime(time.time()-svm_start_time)) + ")")    
-                        
-                        # import numpy as np
-                        # import matplotlib.pyplot as plt
-                        # from sklearn.decomposition import PCA
-
-                        # X = train_outputs_df["output"].values.tolist()
-                        # y = train_outputs_df["period"].values.tolist()
-
-                        # pca = PCA(n_components=2)
-                        # Xreduced = pca.fit_transform(X)
-
-                        # def make_meshgrid(x, y, h=.02):
-                        #     x_min, x_max = x.min() - 1, x.max() + 1
-                        #     y_min, y_max = y.min() - 1, y.max() + 1
-                        #     xx, yy = np.meshgrid(np.arange(x_min, x_max, h), np.arange(y_min, y_max, h))
-                        #     return xx, yy
-
-                        # def plot_contours(ax, clf, xx, yy, **params):
-                        #     Z = clf.predict(np.c_[xx.ravel(), yy.ravel()])
-                        #     Z = Z.reshape(xx.shape)
-                        #     out = ax.contourf(xx, yy, Z, **params)
-                        #     return out
-
-                        # model = LinearSVC(max_iter=1000000000)
-                        # clf = model.fit(Xreduced, y)
-
-                        # fig, ax = plt.subplots()
-                        # # title for the plots
-                        # title = ('Decision surface of linear SVC ')
-                        # # Set-up grid for plotting.
-                        # X0, X1 = Xreduced[:, 0], Xreduced[:, 1]
-                        # xx, yy = make_meshgrid(X0, X1)
-
-                        # print(train_outputs_df)
-
-                        # plot_contours(ax, clf, xx, yy, cmap=plt.cm.coolwarm, alpha=0.8)
-                        # ax.scatter(X0, X1, c=y, cmap=plt.cm.coolwarm, s=20, edgecolors='k')
-                        # ax.set_ylabel('PC2')
-                        # ax.set_xlabel('PC1')
-                        # ax.set_xticks(())
-                        # ax.set_yticks(())
-                        # ax.set_title('Decison surface using the PCA transformed/projected features')
-                        # ax.legend()
-                        # plt.show()
                         
                         del train_outputs_df
                         
@@ -653,7 +605,7 @@ if __name__ == "__main__":
                         
                         # assess the accuracy of the model using Acc, Acc@3, and Acc@5
                         expected_years = test_outputs_df.loc[:, "period"].values.tolist()
-
+                        
                         del test_outputs_df
                         
                         head_file(f"FR_Test/{name}/confusion.csv", "estimate;expected")
