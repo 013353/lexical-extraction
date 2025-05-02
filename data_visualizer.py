@@ -10,8 +10,6 @@ def visualize_profiles(model):
     import os
     from tqdm import tqdm
     import pandas as pd
-    from transformers import BertTokenizerFast
-    from matplotlib import pyplot as plt
     profile_files = os.listdir("FR_Test/profiles")
     print("PROFILES:", profile_files)
 
@@ -27,9 +25,6 @@ def visualize_profiles(model):
         profile.to_csv("temp_data.csv")
 
 def visualize_output(file: str):
-    import numpy as np
-    from sklearn.datasets import load_digits
-    from sklearn.model_selection import train_test_split
     from sklearn.preprocessing import StandardScaler
     import matplotlib.pyplot as plt
     import seaborn as sns
@@ -63,7 +58,7 @@ def visualize_output(file: str):
     plt.savefig("output.png")
     plt.show()
 
-def confusion_matrix(file: str):
+def confusion_matrix(file: str, name: str):
     import pandas as pd
     import seaborn as sns
     import matplotlib.pyplot as plt
@@ -83,7 +78,7 @@ def confusion_matrix(file: str):
     
     print(matrix)
     
-    fig = plt.figure(figsize=(12, 9))
+    plt.figure(figsize=(12, 9))
     # sns.set_theme(
     #     font_scale=0.5,
     #     )
@@ -92,11 +87,82 @@ def confusion_matrix(file: str):
     # ax.set(xlabel="Estimated Time Periods", ylabel="Actual Time Periods")
     ax.set_xlabel("Predicted Time Periods", fontsize=10)
     ax.set_ylabel("Actual Time Periods", fontsize=10)
-    ax.set_title("Confusion Matrix of BP1T Model", fontsize=20)
-    plt.savefig("BP1T_cmatrix.png", dpi=600)
+    ax.set_title(f"Confusion Matrix of {name} Model", fontsize=20)
+    plt.savefig(f"{name}_cmatrix.png", dpi=2400)
+    # plt.show()
+    
+def confusion_matrices(files: dict):
+    import pandas as pd
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    from tqdm import tqdm
+    
+    for name in files:
+        file = files[name]
+        data = pd.read_pickle(file)
+        num_tests = len(data.index)
+        data.sort_values(by=["estimate", "expected"], ignore_index=True, inplace=True)
+        matrix = pd.DataFrame(0, columns=sorted(list(set(data["expected"].tolist()))), index=sorted(list(set(data["expected"].tolist()))))
+        
+        for i, row in tqdm(data.iterrows(), total=len(data.index)):
+            matrix.loc[row["expected"], row["estimate"]] += 1
+        
+        def to_ratio(freq: int) -> float:
+            return round((freq / num_tests), 3)
+        
+        matrix = matrix.map(to_ratio)
+        
+        print(matrix)
+        
+        ax = sns.heatmap(matrix, cmap="viridis", annot=True, square=True, annot_kws={"fontsize": 6}, cbar_kws={"label": "Ratio of Total Tests"})
+        # ax.set(xlabel="Estimated Time Periods", ylabel="Actual Time Periods")
+        ax.set_xlabel("Predicted Time Periods", fontsize=10)
+        ax.set_ylabel("Actual Time Periods", fontsize=10)
+        ax.set_title(f"Confusion Matrix of {name} Model", fontsize=20)
+    
     plt.show()
 
+def graph_results(file: str):
+    import pandas as pd
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    
+    results = pd.read_csv(file)
+    
+    print(results)
+    
+    data = pd.DataFrame(columns=["Amount Removed", "Metric", "Accuracy"])
+    
+    cur_amt = 0
+    for i, row in results.iterrows():
+        for j, el in row.items():
+            if j == "amt":
+                cur_amt = el
+            else:
+                match j:
+                    case "acc":
+                        j = "Acc"
+                    case "acc_3":
+                        j = "Acc@3"
+                    case "acc_5":
+                        j = "Acc@5"
+                data.loc[len(data)] = [cur_amt, j, el]
+
+    print(data)
+    
+    fig = plt.figure()
+    sns.set_theme(style="whitegrid")
+    ax = sns.barplot(data, x="Amount Removed", y="Accuracy", hue="Metric", errorbar="se", palette="viridis_r", err_kws={"linewidth": 1, "color": "#000000"}, capsize=0.25)
+    sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
+    ax.set_title("Accuracy of Lexical Extraction Models")
+    ax.set_xticks(ax.get_xticks(), ["BASE", 0.0625, 0.125, 0.25, 0.5])
+    # plt.show()
+    fig.savefig('accs.png', bbox_inches='tight', dpi=2400)
+    
+def head(file: str):
+    import pandas as pd
+    
+    pd.read_pickle(file).iloc[:10].to_csv("head.csv")
+
 if __name__ == "__main__":
-    foo = "BP1T"
-    csv_to_pickle(f"FR_Test/{foo}/confusion.csv")
-    confusion_matrix(f"FR_Test/{foo}/confusion.pickle")
+    head("FR_Test/BP1T0/train_outputs.pickle")
