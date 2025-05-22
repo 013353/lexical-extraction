@@ -8,7 +8,7 @@ while not completed:
         import pandas as pd
         from tqdm import tqdm
         from sklearn.model_selection import train_test_split
-        from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
+        from sklearn.feature_extraction.text import TfidfVectorizer
         from sklearn.svm import LinearSVC
         from transformers import BertTokenizerFast, BertModel, RobertaTokenizerFast, RobertaModel, LongformerTokenizerFast, LongformerModel
         from transformers.utils import logging
@@ -35,11 +35,9 @@ def head_file(filepath : str,
               ) -> None:
     """
     Clears the given file and adds a header to it, used for CSV file reset
-    
-    Parameters
-    -----------
-    `filepath`: The file to head\n
-    `header`: The header to add to the file
+    :param filepath: The file to head
+    :param header: The header to add to the file
+    :return: None
     """
     
     with open(filepath, "w") as file:
@@ -55,7 +53,6 @@ def clear_dir(directory : str
     `directory`: The directory clear
     """
     
-    
     try:
         files = os.listdir(directory)
         for file in files:
@@ -66,23 +63,19 @@ def clear_dir(directory : str
         os.mkdir(directory)
 
 def generate_profile(corpus : list,
-                     vectorizer : TfidfVectorizer | CountVectorizer,
+                     vectorizer : TfidfVectorizer,
+                     cutoff : float,
                      num : int,
                      name : str
                      ) -> list:
     """
-    Generates a profile of the given `corpus` with the middle 75% of ids
-    
-    Parameters
-    -----------
-    `corpus`: The corpus from which to generate a profile\n
-    `vectorizer`: The vectorizer to weight ids with, this program uses `TfidfVectorizer` and `CountVectorizer` from `sklearn.feature_extraction.text`\n
-    `num`: The process number, used with multiprocessing to keep track of individual processes
-    `name`: The identifier of the current test
-    
-    Returns
-    --------
-    `list`: Middle 75% of ids, sorted from highest to lowest weight
+    Generates a profile of the given ``corpus`` with the top ``cutoff`` quartile removed
+    :param corpus: The corpus from which to generate a profile
+    :param vectorizer: The vectorizer to weight ids with, this program uses ``sklearn.feature_extraction.text.TfidfVectorizer``
+    :param cutoff: The percentile of ids to remove
+    :param num: The process number, used with multiprocessing to keep track of individual processes
+    :param name: The identifier of the current test
+    :return: ``list`` of ids with top ``cutoff`` quartile removed
     """
     
     # convert each doc from a list of ints to a list of strings
@@ -128,16 +121,11 @@ def generate_profile(corpus : list,
     del weights_df
     
     # find the mean and standard deviation of the set of integers with the same length as sorted_weights_df
-    #TODO make this more succinct
     weights_x = []
     for i, row in sorted_weights_df.iterrows():
         weights_x.append(row["weight"])
     weights_mean = np.mean(range(len(weights_x)))
     weights_std = np.std(range(len(weights_x)))
-    
-    # # maybe this is better?
-    # weights_mean = np.mean(weights_x)
-    # weights_std = np.std(weights_x)
     
     def bell_curve(x, std, mean, mult=1):
         return mult/(std * np.sqrt(2 * np.pi)) * np.e**( - (x - mean)**2 / (2 * std**2))
@@ -157,11 +145,10 @@ def generate_profile(corpus : list,
     sorted_weights_df = sorted_weights_df.sort_values(by=sorted_weights_df.columns[0], axis=0, ascending=False)
     
     # identify the upper and lower quantile boundaries
-    bottom = sorted_weights_df.quantile(0.125)["weight"]
-    # top = sorted_weights_df.quantile(0.875)["weight"]
+    print("Cutoff:", cutoff)
+    bottom = sorted_weights_df.quantile(cutoff)["weight"]
     
     # remove weights outside the selected quantile range
-    # middle_weights = sorted_weights_df[sorted_weights_df["weight"] < top]
     middle_weights = sorted_weights_df[sorted_weights_df["weight"] > bottom]
     
     # identify the ids in the selected range, save to file, return
@@ -175,23 +162,25 @@ def add_inputs_to_file(period : int,
                        filepath : str,
                        tokenizer : any,
                        tokenizer_params : tuple[str, int],
-                       vectorizer : TfidfVectorizer | CountVectorizer,
+                       vectorizer : TfidfVectorizer,
+                       cutoff : float,
                        num : int,
                        name : str,
                        generate_profile_and_mask : bool 
                         ) -> None:
     """
-    Adds `docs` to `file` with masks and `period` data
-    
-    Parameters
-    -----------
-    `period`: The time period of `docs`\n
-    `docs`: `pandas.Series` of the documents in the `period`\n
-    `filepath`: The location of the file to write to\n
-    `tokenizer`: The algorithm to use to tokenize `docs`\n
-    `tokenizer_params` (`mode`, `size`): The set of parameters to pass to the chunker before tokenizing\n
-    `vectorizer`: The vectorizer to weight ids with, this program uses `TfidfVectorizer` and `CountVectorizer` from `sklearn.feature_extraction.text`\n
-    `num`: The process number, used with multiprocessing to keep track of individual processes
+    Adds ``docs`` to ``file`` with masks and ``period`` data
+    :param period: The time period of ``docs``
+    :param docs: ``pandas.Series`` of the documents in the ``period``
+    :param filepath: The location of the file to write to
+    :param tokenizer: The algorithm to use to tokenize the documents
+    :param tokenizer_params: (``mode``, ``size``): The set of parameters to pass to the chunker before tokenizing
+    :param vectorizer: The vectorizer to weight ids with, this program uses ``sklearn.feature_extraction.text.TfidfVectorizer``
+    :param cutoff: The percentile of ids to remove
+    :param num: The process number, used with multiprocessing to keep track of individual processes
+    :param name: The identifier of the current test
+    :param generate_profile_and_mask: ``true`` if lexical extraction should be performed, otherwise ``false``
+    :return:
     """
     
     # tokenize each document in the given period
@@ -205,8 +194,7 @@ def add_inputs_to_file(period : int,
 
     if generate_profile_and_mask:
         # generate profile and append it to file
-        profile = generate_profile(tokenized_period, vectorizer, num, name)
-        # profile = pd.read_csv(f"FR_Test/BP1T/profiles/{num}.csv")
+        profile = generate_profile(tokenized_period, vectorizer, cutoff, num, name)
         with open(filepath, "a") as file:
             for doc in tokenized_period:
                 mask = []
@@ -226,19 +214,12 @@ def tokenize(dataset : any,
              model: any
              ) -> list:
     """
-    Tokenizes documents from `dataset`
-    
-    Parameters
-    -----------
-    `dataset`: `pandas.Series` of the documents to tokenize\n
-    `mode` (`"sentence"`, `"paragraph"`, `"word"`): The mode to chunk each document with\n
-    `size`: The size of each chunk\n
-    `model`: The algorithm to use to tokenize each document
-    
-    Returns
-    --------
-    `list`: The chunked documents as a 2D list
-    
+    Tokenize documents from the given ``dataset``
+    :param dataset: ``pandas.Series`` of the documents to tokenize
+    :param mode: *{'sentence', 'paragraph', 'word'}*: The mode to chunk each document with
+    :param size: The number of each unit of ``mode`` in each chunk
+    :param model: The algorithm to use to tokenize the documents
+    :return: Chunked documents as a 2D list
     """
     
     # create a list of docs separated into chunks
@@ -275,20 +256,9 @@ def tokenize(dataset : any,
 def separate_periods(df : pd.DataFrame
                      ) -> dict[int, pd.DataFrame]:
     """
-    Separates docs in `df` by period
-    
-    Parameters
-    -----------
-    `df`: The dataframe to separate\n
-        `columns` = [`"filepath"`, `"title"`, `"year"`]
-    
-    Returns
-    --------
-    `dict`: The documents separated by period\n
-        `key`: Period\n
-        `value`: `pandas.DataFrame` of docs in the period\n
-            `columns` = [`"filepath"`, `"title"`, `"year"`]
-
+    Separate docs in ``df`` by period
+    :param df: The dataframe to separate, with columns [``'filepath``, ``'title'``, ``'year'``]
+    :return: The documents separated by period in {period: ``pandas.DataFrame``} pairs with DataFrame columns [``'filepath``, ``'title'``, ``'year'``]
     """
     
     periods = {}
@@ -316,14 +286,11 @@ def separate_periods(df : pd.DataFrame
 def sample_chunks(input : list,
                   num : int
                   ) -> list:
-    """Samples `num` chunks from the `input` list of chunks
-
-    Args:
-        input (list): The list of chunks to sample from
-        num (int): The number of chunks to sample from `input`
-
-    Returns:
-        list: The sampled chunks
+    """
+    Samples ``num`` chunks from the ``input`` list of chunks
+    :param input: The list of chunks to sample from
+    :param num: The number of chunks to sample from ``input``
+    :return: The sampled chunks
     """
 
     return pd.Series(input).sample(frac=1, ignore_index=True).truncate(after=num-1).tolist()
@@ -331,24 +298,18 @@ def sample_chunks(input : list,
 def get_accuracy(estimate : int,
                  expected : int,
                  name : str
-                 ) -> tuple[bool, bool, bool]:
+                 ) -> tuple[int, int, int]:
     """
-    Returns a tuple of bools of if the `estimate` is within each measure of `expected`
-    
-    `Acc@K` is a measure of accuracy that considers all documents within K/2 periods of expected to be accurate (Ren et al., 2023)
-    
-    Parameters
-    -----------
-    `estimate`: The estimated period\n
-    `expected`: The actual period
-    
-    Returns
-    --------
-    `tuple`: (`acc`, `acc@3`, `acc@5`)
-        (`bool`, `bool`, `bool`)
-    
+    Returns a tuple of ``bool``s of if the ``estimate`` is within each measure of ``expected``
+
+    ``Acc@K`` is a measure of accuracy that considers all documents within ⌊K/2⌋ periods of expected to be accurate (Ren et al., 2023)
+
+    :param estimate: The estimated period
+    :param expected: The actual period
+    :param name: The identifier of the current test
+    :return: A tuple of (``acc``, ``acc@3``, ``acc@5``)
     """
-    
+
     acc, acc_3, acc_5 = (0, 0, 0)
     if estimate == expected: acc = 1
     if expected-PERIOD_LENGTH <= estimate <= expected+PERIOD_LENGTH: acc_3 = 1
@@ -364,13 +325,11 @@ def match_lengths(col : str,
                   df : pd.DataFrame
                   ) -> None:
     """
-    Sets the length of `col` of `df` to a set length
-    
-    Parameters
-    -----------
-    `col`: The column to edit\n
-    `length`: The length to adjust to\n
-    `df`: The  `pandas.DataFrame` to adjust
+    Sets the length of ``col`` of ``df`` to a set length, runs in-place
+    :param col: The column to edit
+    :param length: The length to adjust to
+    :param df: The ``pandas.DataFrame`` to adjust
+    :return:
     """
     
     # get the specified column of `df` as a series
@@ -384,24 +343,20 @@ def match_lengths(col : str,
 def transformer_model(data : pd.DataFrame,
                       model : any,
                       output_filepath : str,
-                      name : str
                       ) -> pd.DataFrame:
-    """Runs the given transformer model on the given data
-
-    Args:
-        data (pd.DataFrame): the data to run on
-        transformer (any): the transformer model to use, such as `BERT` or `RoBERTa` or `Longformer`
-        output_filepath (str): the file to print output data to
-
-    Returns:
-        pd.DataFrame: the output data of the transformer
+    """
+    Runs the given transformer model on the given data
+    :param data: The data to run on
+    :param model: The transformer model to use, such as ``BERT`` or ``RoBERTa`` or ``Longformer``
+    :param output_filepath: The file to print output data to
+    :return: A ``pd.DataFrame`` containing the output data of the transformer
     """
 
     with open(output_filepath, "a") as output_file:
 
         # pass all docs through the model, batch size specified above
-        NUM_BATCHES  = int(np.ceil(len(data.index)/BATCH_SIZE))
-        for batch in tqdm(range(NUM_BATCHES), desc=transformer):
+        num_batches  = int(np.ceil(len(data.index)/BATCH_SIZE))
+        for batch in tqdm(range(num_batches), desc=transformer):
             
             # torch.no_grad() disables gradient calculation to prevent OOM error
             with torch.no_grad():
@@ -419,15 +374,12 @@ def transformer_model(data : pd.DataFrame,
                 # pass tensors into model, get pooler_output
                 output = model.forward(input_ids=docs, attention_mask=masks).pooler_output.tolist()
                 
-                # print(len(output) == BATCH_SIZE)
-                
                 # add outputs to file
                 for i in range(int(last-first)):
                     output_file.write(f"\n{output[i]};{data.loc[first+i, "period"]}")
 
     # create a dataframe from the outputs of the model
     outputs_df = pd.read_csv(output_filepath, sep=";")
-    # outputs_df = outputs_df.sample(frac=0.25).reset_index(drop=True)
     outputs_df["output"] = outputs_df["output"].apply(lambda x: eval(x))
 
     return outputs_df
@@ -442,9 +394,6 @@ if __name__ == "__main__":
     # activate PyTorch cuda support if available
     dev = "cuda:0" if torch.cuda.is_available() else "cpu"
     print("Device:", dev)
-
-    # clear and head results file
-    # head_file("FR_Test/results.csv", "transformer;chunker_params;model;acc;acc@3;acc@5")
 
     completed_tests = []
 
@@ -476,8 +425,18 @@ if __name__ == "__main__":
                         max_input_length = 512
             
                 for lexical_extraction in [True, False]:
-                    
-                    for trial_num in range(3):
+
+                    # Test different cutoffs for token masking
+                    for trial_num in range(4):
+                        match trial_num:
+                            case 0:
+                                cutoff = 0.0625
+                            case 1:
+                                cutoff = 0.125
+                            case 2:
+                                cutoff = 0.25
+                            case 3:
+                                cutoff = 0.5
 
                         name = transformer[0] + chunker_params[0][0].upper() + str(chunker_params[1])[0] + ("T" if lexical_extraction else "F") + str(trial_num)
 
@@ -491,7 +450,7 @@ if __name__ == "__main__":
                             clear_dir(f"FR_Test/{name}")
 
                             # initialize vectorizer
-                            vectorizer = TfidfVectorizer() if lexical_extraction else CountVectorizer()
+                            vectorizer = TfidfVectorizer()
 
                             # delete all train_data and profile files
                             clear_dir(f"FR_Test/{name}/train_data")
@@ -501,7 +460,7 @@ if __name__ == "__main__":
                             processes = []
                             i=0
                             for key, value in tqdm(separate_periods(train).items(), desc="Starting Profile Generators"):
-                                process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/{name}/train_data/train_data_{i}.csv", tokenizer, chunker_params, vectorizer, i, name, lexical_extraction))
+                                process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/{name}/train_data/train_data_{i}.csv", tokenizer, chunker_params, vectorizer, cutoff, i, name, lexical_extraction))
                                 processes.append(process)
                                 process.start()
                                 i+=1
@@ -532,7 +491,7 @@ if __name__ == "__main__":
                             head_file(f"FR_Test/{name}/train_outputs.csv", "output;period")
                             
                             # pass the train data through the transformer model and save to CSV
-                            train_outputs_df = transformer_model(train_data, model, f"FR_Test/{name}/train_outputs.csv", name)
+                            train_outputs_df = transformer_model(train_data, model, f"FR_Test/{name}/train_outputs.csv")
                             
                             del train_data
 
@@ -547,7 +506,7 @@ if __name__ == "__main__":
                             processes = []
                             i=0
                             for key, value in tqdm(separate_periods(test).items(), desc="Starting Profile Generators"):
-                                process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/{name}/test_data/test_data_{i}.csv", tokenizer, chunker_params, vectorizer, i, name, False))
+                                process = mp.Process(target=add_inputs_to_file, args=(key, value, f"FR_Test/{name}/test_data/test_data_{i}.csv", tokenizer, chunker_params, vectorizer, 0, i, name, False))
                                 processes.append(process)
                                 process.start()
                                 i+=1
@@ -575,7 +534,7 @@ if __name__ == "__main__":
                             # clear test_outputs.csv
                             head_file(f"FR_Test/{name}/test_outputs.csv", "output;period")
                             
-                            test_outputs_df = transformer_model(test_data, model, f"FR_Test/{name}/test_outputs.csv", name)
+                            test_outputs_df = transformer_model(test_data, model, f"FR_Test/{name}/test_outputs.csv")
                             
                             del test_data
                             
@@ -589,7 +548,7 @@ if __name__ == "__main__":
                             # initialize SVM
                             svm = LinearSVC(max_iter=100000000)
                             
-                            # train the SVM om the training outputs
+                            # train the SVM on the training outputs
                             svm_start_time = time.time()
                             print("Training SVM... ", end="", flush=True)
                             svm.fit(np.array(train_outputs_df["output"].values.tolist()), np.array(train_outputs_df["period"].values.tolist()))
@@ -633,11 +592,6 @@ if __name__ == "__main__":
                             # add results to results.csv
                             result_line = transformer + ";" + str(chunker_params) + ";"
                             result_line += "LE" if lexical_extraction else "BASE"
-                            match lexical_extraction:
-                                case TfidfVectorizer():
-                                    result_line += "tf-idf"
-                                case CountVectorizer():
-                                    result_line += "count"
                             result_line += ";" + str(acc) + ";" + str(acc_3) + ";" + str(acc_5)
                             with open("FR_Test/results.csv", "a") as results_file:
                                 results_file.write("\n" + result_line)

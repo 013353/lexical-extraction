@@ -1,33 +1,48 @@
 from functools import lru_cache
 
 
-def csv_to_pickle(csv_file: str, sep=";", pickle_file=None):
+def csv_to_pickle(csv_file: str, sep=";", pickle_file=None) -> None:
+    """
+    Converts a csv file to a pickle file
+    :param csv_file: The csv file to convert
+    :param sep: The separator used in the CSV file
+    :param pickle_file: Filepath of the destination pickle file
+    :return:
+    """
     import pandas as pd
     if not pickle_file:
         pickle_file = csv_file[:-3] + "pickle"
-        print(pickle_file)
+        print("SAVED TO:", pickle_file)
     
     pd.read_csv(csv_file, sep=sep).to_pickle(pickle_file)
 
-def visualize_profiles(model):
+def visualize_profiles(directory: str, model) -> None:
+    """
+    Visualize the profiles at the given directory as tokens and output to a CSV file
+    :param directory: The directory containing the profiles
+    :param model: The model to use to convert ids to tokens, should be the same as the original tokenizer model
+    :return:
+    """
     import os
     from tqdm import tqdm
     import pandas as pd
-    profile_files = os.listdir("FR_Test/profiles")
+    profile_files = os.listdir(directory)
     print("PROFILES:", profile_files)
 
     profiles = []
 
     for prf in tqdm(profile_files):
-        profile = pd.read_csv("FR_Test/profiles/" + prf, header=0, names=["token", "weight"])
-        print(profile)
-        input()
+        profile = pd.read_csv(directory + "/" + prf, header=0, names=["token", "weight"])
         profile.loc[:, "token"] = model.convert_ids_to_tokens(profile.loc[:, "token"].values.tolist())
         profiles.append(profile)
-        print(profile)
         profile.to_csv("temp_data.csv")
 
-def visualize_output(file: str):
+def visualize_output(pickle_file: str) -> None:
+    """
+    Visualize the relatedness of the given output using UMAP dimensionality reduction
+    :param pickle_file: The file containing the output of the model
+    :return:
+    """
     from sklearn.preprocessing import StandardScaler
     import matplotlib.pyplot as plt
     import seaborn as sns
@@ -35,16 +50,12 @@ def visualize_output(file: str):
     import umap
     sns.set_theme(style='white', context='notebook', rc={'figure.figsize':(14,10)})
 
-    df = pd.read_pickle(file).sample(frac=0.01)
-    print(df)
+    df = pd.read_pickle(pickle_file).sample(frac=0.01)
     reducer = umap.UMAP()
     data = df.iloc[:, 0].tolist()
     years = df.iloc[:, 1]
     del df
-    print(1)
-    # print(data)
     scaled_data = StandardScaler().fit_transform(data)
-    print(2)
     del data
     embedding = reducer.fit_transform(scaled_data)
     print(embedding.shape)
@@ -62,10 +73,15 @@ def visualize_output(file: str):
     plt.show()
 
 @lru_cache
-def cmatrix_df(file: str):
+def cmatrix_df(pickle_file: str):
+    """
+    Convert a long dataframe of confusion data to a confusion matrix
+    :param pickle_file: The pickle file of the dataframe containing each pair of expected and estimated periods
+    :return: The DataFrame of the confusion matrix
+    """
     import pandas as pd
     from tqdm import tqdm
-    data = pd.read_pickle(file)
+    data = pd.read_pickle(pickle_file)
     num_tests = len(data.index)
     data.sort_values(by=["estimate", "expected"], ignore_index=True, inplace=True)
     matrix = pd.DataFrame(0, columns=sorted(list(set(data["expected"].tolist()))),
@@ -79,15 +95,18 @@ def cmatrix_df(file: str):
 
     matrix = matrix.map(to_ratio)
 
-    print(matrix)
     return matrix
 
-def confusion_matrix(file: str, name: str):
-    import pandas as pd
+def confusion_matrix(pickle_file: str, name: str) -> None:
+    """
+    Create a confusion matrix from a serialized long DataFrame of confusion data
+    :param pickle_file: The pickle file of the dataframe containing each pair of expected and estimated periods
+    :param name: The name of the model
+    :return:
+    """
     import seaborn as sns
     import matplotlib.pyplot as plt
-    from tqdm import tqdm
-    matrix = cmatrix_df(file)
+    matrix = cmatrix_df(pickle_file)
     
     plt.figure(figsize=(12, 9))
     
@@ -99,7 +118,12 @@ def confusion_matrix(file: str, name: str):
     plt.savefig(f"{name}_cmatrix.png", dpi=1200, format="png")
     plt.show()
 
-def confusion_matrices(files: dict):
+def confusion_matrices(pickle_files: dict) -> None:
+    """
+    Create confusion matrices from serialized long DataFrames of confusion data in a single image
+    :param pickle_files: A dictionary of {name of test: DataFrame} pairs
+    :return:
+    """
     import pandas as pd
     import seaborn as sns
     import matplotlib.pyplot as plt
@@ -110,13 +134,11 @@ def confusion_matrices(files: dict):
 
     long_df = pd.DataFrame(columns=range(1800, 2010, 10))
 
-    for name in files:
-        matrix = cmatrix_df(files[name])
+    for name in pickle_files:
+        matrix = cmatrix_df(pickle_files[name])
         matrix["amt-removed"] = [name] * len(matrix)
 
         long_df = pd.concat([long_df, matrix])
-
-    print(long_df)
 
     g = sns.FacetGrid(long_df, col="amt-removed", sharey=False)
     g.map_dataframe(draw_heatmap)
@@ -127,17 +149,19 @@ def confusion_matrices(files: dict):
 
     plt.tight_layout()
     plt.savefig("heatmaps.png", dpi=4800)
-    plt.savefig("heatmaps.svg")
     plt.show(dpi=2400)
 
-def graph_results(file: str):
+def graph_results(pickle_file: str) -> None:
+    """
+    Create a bar graph of the results of the model using a serialized DataFrame of accuracy measurements
+    :param pickle_file: The serialized DataFrame of accuracy measurements
+    :return:
+    """
     import pandas as pd
     import seaborn as sns
     import matplotlib.pyplot as plt
     
-    results = pd.read_csv(file)
-    
-    print(results)
+    results = pd.read_pickle(pickle_file)
     
     data = pd.DataFrame(columns=["Amount Removed", "Metric", "Accuracy"])
     
@@ -155,8 +179,6 @@ def graph_results(file: str):
                     case "acc_5":
                         j = "Acc@5"
                 data.loc[len(data)] = [cur_amt, j, el]
-
-    print(data)
     
     fig = plt.figure()
     sns.set_theme(style="whitegrid")
@@ -164,13 +186,9 @@ def graph_results(file: str):
     sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
     ax.set_title("Accuracy of Lexical Extraction Models")
     ax.set_xticks(ax.get_xticks(), ["BASE", 0.0625, 0.125, 0.25, 0.5])
+    fig.savefig('accs.png', bbox_inches='tight', dpi=2400)
     plt.show()
-    # fig.savefig('accs.png', bbox_inches='tight', dpi=2400)
-    
-def head(file: str):
-    import pandas as pd
-    
-    pd.read_pickle(file).iloc[:10].to_csv("head.csv")
 
 if __name__ == "__main__":
+    # RUN FUNCTIONS TO VISUALIZE DATA
     pass
