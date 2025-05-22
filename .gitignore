@@ -1,8 +1,11 @@
 .venv/
 .vscode/
+.idea/
 Documents/
 */__pycache__
 *.pyc
 *.csv
 *.pickle
 *.png
+*.svg
+*.zip
